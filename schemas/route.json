@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "description": "The role that should handle an event the router could not settle from state alone. Returned by the root role when delegate.py has fallen back to a default. It is read by a shell step that accepts a known role and ignores anything else, so an answer outside the enum costs nothing but is also worth nothing.",
+  "properties": {
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "enum": [
+          "claude",
+          "architect",
+          "researcher",
+          "implementor",
+          "designer",
+          "tester",
+          "writer",
+          "undecided"
+        ]
+      },
+      "description": "The role or roles that should serve this trigger, in the order they should run. `claude` means the maintainer asked a QUESTION - answer it, start nothing. Working roles mean they asked for WORK. A single-element [`undecided`] means the trigger does not say which, and is a real answer: it falls back to the route the script chose rather than manufacturing a guess. Plural is for a request that genuinely needs two roles - it is not a hedge, and `undecided` never appears alongside another entry."
+    },
+    "why": {
+      "type": "string",
+      "description": "What in the issue decided it, in one sentence, naming the thing you read rather than the conclusion. The maintainer sees this instead of the guess notice, so it has to stand on its own."
+    },
+    "remedy": {
+      "type": "string",
+      "description": "The one-line change to the issue that would let the script route it next time without asking - usually the Role: stamp it is missing, or which task to trigger instead. \u26a0\ufe0f Deciding correctly does not repair the issue: the next run reaches the same fallback, so the fix still has to be said out loud."
+    }
+  },
+  "required": [
+    "roles",
+    "why",
+    "remedy"
+  ],
+  "additionalProperties": false
+}

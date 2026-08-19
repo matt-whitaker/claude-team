@@ -1,0 +1,89 @@
+{
+  "type": "object",
+  "description": "What a Researcher returns from a spike. Every key is required. This is the whole deliverable: the role holds no shell and writes no files, so a scripted hook posts this to the issue and nothing else the run produced is kept.",
+  "properties": {
+    "answer": {
+      "type": "string",
+      "description": "The answer to the question the spike asked, in one or two sentences. A reader who stops here should still have the thing they wanted. Not a summary of what you did - the answer."
+    },
+    "options": {
+      "type": "array",
+      "description": "The routes actually available, each with the property that would make someone pick it. Empty only when the question turned out to have a single answer rather than a choice.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "option": {
+            "type": "string",
+            "description": "The route, named the way a reader would refer to it."
+          },
+          "distinguishes": {
+            "type": "string",
+            "description": "What actually separates it from the others - cost, support, failure mode, who it stops working for. Not a feature list; the one property a decision turns on."
+          },
+          "costs": {
+            "type": "string",
+            "description": "What taking it gives up or requires, stated concretely. An option with no cost written down has not been examined."
+          }
+        },
+        "required": ["option", "distinguishes", "costs"],
+        "additionalProperties": false
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "description": "What each claim rests on. ⚠️ Every external fact needs a source and the date it was checked - support tables and pricing move, and an uncited claim becomes folklore the next reader cannot re-check.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "type": "string",
+            "description": "The specific thing established, stated so it can be checked rather than believed."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where it came from - a URL, or a repo-relative path. Prefer a primary source (a spec, the vendor own docs, a release note) over an article describing one."
+          },
+          "checkedOn": {
+            "type": "string",
+            "description": "The date this was true, YYYY-MM-DD, as far as you could tell from the source itself."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "True when you read it directly at that source. False when it is your inference from what you read. ⚠️ A reader will not re-check a confident claim, so an inference presented as fact is how a wrong decision gets made with full confidence."
+          }
+        },
+        "required": ["claim", "source", "checkedOn", "verified"],
+        "additionalProperties": false
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "description": "What you could NOT determine. ⚠️ The most valuable key here and the one under most pressure to leave empty: a spike reporting only what it settled reads as complete and is not, and the next person re-derives the gap without knowing it was a gap. Empty is a real answer, but it is rarely the true one.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "What remains open, stated as the question rather than as a topic."
+          },
+          "whyNot": {
+            "type": "string",
+            "description": "What stopped you - no source, contradictory sources, or it cannot be settled short of building the thing. That last one is a real finding and sometimes the correct one."
+          },
+          "howToSettle": {
+            "type": "string",
+            "description": "What would answer it. ⚠️ Where that is a measurement, say exactly what to run and what result would mean what: this role holds no shell, so a measurement is a separate task someone else runs, and this field is its brief."
+          }
+        },
+        "required": ["question", "whyNot", "howToSettle"],
+        "additionalProperties": false
+      }
+    },
+    "recommendation": {
+      "type": "string",
+      "description": "What you would do, stated as a choice rather than a survey - and what would change your mind. A recommendation nothing could overturn is not a recommendation."
+    }
+  },
+  "required": ["answer", "options", "evidence", "unknowns", "recommendation"],
+  "additionalProperties": false
+}

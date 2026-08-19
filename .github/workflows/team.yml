@@ -1,0 +1,2016 @@
+name: Claude
+# ⚠️ A ternary chain because `run-name` has no variables and no `needs` context — this
+# shape is the only one available. `>-` folds the newlines to spaces, and YAML parses
+# before expressions evaluate, so it is one line by the time it runs. There is no
+# substring function in GitHub expressions, so a long title cannot be truncated here.
+#
+# ⚠️ EVERY CONTINUATION LINE SITS AT THE SAME INDENT as `Claude ·`. A folded scalar keeps
+# a *more*-indented line literal, newline and all — indenting the `||` arms to line them
+# up reads better and silently leaves real newlines inside the expression.
+run-name: >-
+  Claude ·
+  ${{ github.event_name == 'pull_request'
+  && (github.event.pull_request.merged && 'Post-merge' || 'PR closed')
+  || contains(github.event.comment.body || github.event.review.body, '@claude/architect') && 'Architect'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/implementor') && 'Implementor'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/tester') && 'Tester'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/writer') && 'Writer'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/designer') && 'Designer'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/security') && 'Security'
+  || 'Delegate' }}
+  · #${{ github.event.issue.number || github.event.pull_request.number }}
+  ${{ github.event.issue.title || github.event.pull_request.title }}
+
+# ONE WORKFLOW, EIGHT JOBS, EIGHT ROLES. Kept in one file so the Actions history stays
+# readable: one run per trigger, with whatever was not selected skipping inside it rather
+# than filling the list with skipped runs.
+#
+#   delegate            routes — scripted, with the root role consulted only on a guess
+#   architect           shapes work and cuts tasks
+#   claude              the root role answering, and naming process repairs
+#   researcher          answers a spike — no shell
+#   authors             Implementor | Designer | Tester | Writer — one per run, gated steps
+#   security            on merge, plus on request via @claude/security
+#   custodial           checks what the run left behind — no model
+#   merge_housekeeping  on merge — no model
+#
+# ⚠️ A SANDWICH: `delegate` in front, `custodial` behind, and the roles between them. Both ends
+# are scripted first and consult a model only where a script cannot decide. Every check the back
+# half makes is unanswerable at the front — see custodial-sweep.py.
+#
+# ⚠️ THE AUTHORS JOB IS NOT A CHAIN, and briefly claimed to be (#500). `delegate.py` emits
+# exactly ONE role, so exactly one of its gated steps ever runs. That is deliberate: the
+# Architect cuts `Role: tester` and `Role: writer` tasks per story, ordered after the
+# authoring ones, so every role is triggered on its own work rather than dragged behind
+# another. They share a job to share its setup, not to run in sequence.
+#
+# ⚠️ WHICH IS WHY THE HANDOFF TRAVELS BY COMMENT. Roles that do not share a run cannot share
+# a step output — `post-handoff.py` puts the author's JSON on the story's ISSUE, where the
+# Tester and Writer read it on their own triggers. The issue, not the PR: the story's PR does
+# not exist until a task has merged into its branch.
+#
+# ⚠️ THE DELEGATOR ROUTES. Two ways in, one router:
+#
+#   label "@claude" on an issue  -> delegate.py reads issue state and picks the role
+#   "@claude" in a comment       -> same
+#   "@claude/<role>" in a comment-> delegate.py rule 1 returns that role outright
+#
+# Every model job carries `needs: delegate` and gates on `needs.delegate.outputs.roles`.
+# A job cannot gate on a step inside itself, which is why the router is its own job.
+#
+# ⚠️ THIS IS NOT THE `needs:` SHAPE #430 REVERTED. There, roles needed `implementor`, which
+# itself skipped most runs — and a job needing a skipped job reports cancelled, which was
+# the noise. `delegate` always RUNS whenever the workflow triggers, so dependents reach
+# their own `if:` and skip cleanly. The alternative — delegate as a step inside every job
+# that needs it — spins a runner per job to check out a repo and then do nothing.
+#
+# ⚠️ A HANDLE MUST NEVER BE BLOCKED BY THE ROUTER. Each role's `if:` is
+# `always() && (router picked me || the comment names me)`, so an explicit handle still
+# routes when delegate.py fails outright. Only a *skipped* delegate skips the roles.
+#
+# ⚠️ THE LOOP GUARD IS THE EXACT LABEL NAME. Roles stamp "@claude/<role>", and every stamp
+# is another `issues: labeled` event. The delegate job requires
+# `github.event.label.name == '@claude'` — an exact match, so no "@claude/..." stamp can
+# re-enter — backed by the bot-actor guard, since the stamp is applied as a bot. Both must
+# hold; either alone is one edit away from an infinite loop rather than a visible failure.
+#
+# ⚠️ RE-ADDING "@claude" IS THE "RUN AGAIN" GESTURE, deliberately. `labeled` fires on every
+# add, so removing and re-adding re-runs the delegator on current issue state — which is
+# what you want after editing the issue. Concurrency queues it behind any run in flight.
+#
+# ⚠️ BACKLOG WORK IS SCRIPTED, NOT PROMPTED. Every role carries hard-coded hooks around
+# its model step, from `packages/claude-team/hooks/`:
+#
+#   delegate job          acknowledge.py           reacts 👀 so the trigger is visibly received
+#   delegate job          delegate.py              picks the role from issue state
+#   pre   every role      labels-and-status.py     MODE=stamp — @claude/<role> on the issue or PR
+#   pre   authors job     labels-and-status.py     MODE=status — board: place + set Status
+#   post  architect       labels-and-status.py     MODE=status — places the story + tasks as Todo
+#   pre   authors         branch-navigation.py     upserts the story's branch — authors only
+#   post  architect       labels-and-status.py     MODE=kind — the classification label
+#   post  architect       file-sub-issues.py       parents stories to epics, tasks to stories
+#   post  authors job     capture-failure.py       failure branch + report when a run cannot land
+#   post  authors job     finish-pr.py             labels the PR, appends `Closes #<issue>`
+#   post  authors job     post-handoff.py          puts the JSON handoff on the story's ISSUE
+#   post  arch + authors  log-to-story.py          rewrites the story's task list in trigger order
+#   post  authors job     log-to-epic.py           rewrites the epic's rolling work log
+#   merge (no role)       close-merged-work.py     closes the PR's issues, files them on the board
+#   merge (no role)       log-to-story.py          the same list, now the merged task has closed
+#   merge (no role)       open-story-pr.py         opens the story's PR when the last task completes
+#
+# ⚠️ `open-story-pr.py` opens the story's PR when the LAST task completes — the target
+# experience is: trigger the story, come back to a finished PR. The all-tasks-closed gate lives
+# in the hook, so both call sites (authors job and merge) inherit it identically.
+#
+# ⚠️ The authors job's post-hooks run ONCE at the end of the job, not once per role. The
+# stamps are the exception: each role stamps immediately before its own model step, so a run
+# that dies in the model reads as "this role was here" rather than as nothing at all.
+#
+# These used to be prompt instructions, and a model could skip them — the label trail is
+# worthless if a run can forget to stamp it. They cost no turns and cannot be forgotten.
+#
+# ⚠️ EVERY JOB COPIES THEM TO $RUNNER_TEMP AND RUNS THEM FROM THERE. The workflow YAML
+# always comes from the default branch; a `run:` path does NOT — it reads the working
+# tree, which the model has by then switched to a feature or epic branch. A branch cut
+# before a hook landed does not carry it, so the post-hooks died with exit 127 on an epic
+# branch holding three of the six scripts. While they were inline `run: |` blocks their
+# bodies travelled with the YAML and were immune; moving them to files traded that for
+# readability. The stash step runs while the tree is still the default branch, so the copy
+# is current by construction, and it sits outside the repo so nothing can commit it.
+#
+# ⚠️ EACH ROLE'S PROMPT IS A FILE — `.github/agent-prompts/<role>.md`, loaded by the local
+# `./.github/actions/load-prompt` composite action. It reads the working tree, so like the
+# hooks above it must run BEFORE the model step, which checks out a feature branch partway
+# through. It sits second in every job, right after checkout; that position is load-bearing.
+# A prompt file cannot hold `${{ }}` — Actions never evaluates inside a file — so anything
+# dynamic goes in the model step's env instead (Security's `PR` is the only one today).
+#
+# ⚠️ PROJECTS_TOKEN appears in `close-merged-work.py` and `labels-and-status.py`, and
+# nowhere else. It is a long-lived classic PAT covering every project the maintainer owns,
+# and secret masking covers logs only — not an API payload a model could write — so it
+# stays out of any environment a prompt can read. Step env is per-step, which is what makes
+# these two safe: the model step in the same job cannot see it.
+on:
+  # the primary trigger. Gated to the label being exactly "@claude" — see the loop guard.
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  # review submissions (approve / request-changes) carry their text in
+  # github.event.review.body, not github.event.comment.body
+  pull_request_review:
+    types: [submitted]
+  # merge housekeeping only — no model runs on this event
+  pull_request:
+    types: [closed]
+
+# one Claude run at a time per issue/PR, across all roles. Queue rather than cancel:
+# killing a run midway can leave a half-pushed branch and no PR.
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22
+
+jobs:
+  # ── Delegate ───────────────────────────────────────────────────────────────────
+  # The router. Acknowledges the trigger, then decides which role handles it. Every model
+  # job below hangs off this one.
+  #
+  # ⚠️ NO MODEL, on purpose. Routing was going to be a model step emitting JSON, and "a
+  # model producing data a consumer depends on" is the pattern this repo has been bitten by
+  # most. Sitting in front of every role makes a bad decision here cost the whole run;
+  # almost none of it needs judgement. See the header for the loop guard and the `needs:`
+  # note, and delegate.py for the precedence rules.
+  delegate:
+    # ⚠️ `brewdocs-claude[bot]` — the Phase-2 dispatch App — is INTENDED to pass this guard:
+    # its label-adds are how a story cascades. The two exclusions below stay the loop guard,
+    # because every event a role run creates is authored by one of them.
+    # ⚠️ THESE LINES MUST STAY OUTSIDE THE `if: |` BLOCK. A literal block scalar has no
+    # comments — a `#` line indented under it becomes part of the EXPRESSION, and GitHub
+    # rejects the whole file (0 jobs, no log, run named for the path). See #1085.
+    if: |
+      github.actor != 'claude[bot]' && github.actor != 'github-actions[bot]' && (
+        (github.event_name == 'issues' && github.event.label.name == '@claude') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # write so the unroutable path can leave a comment rather than skipping silently
+      issues: write
+      pull-requests: read
+      # ⚠️ For `capture-transcript`'s OIDC and nothing else — the same pairing documented for
+      # `claude` and `researcher`. The interception step passes `github_token`, so the OIDC path
+      # for GitHub auth stays short-circuited, and the action deletes ACTIONS_ID_TOKEN_REQUEST_*
+      # from the environment it hands the model, so the agent cannot reach this permission.
+      id-token: write
+    outputs:
+      # ⚠️ FROM `resolve`, NOT `route`. Where the script had to fall back to a default, the root
+      # role is asked inside this job and `resolve` settles which of the two answers wins. Reading
+      # `route` here would run the guess and quietly discard the answer.
+      roles: ${{ steps.resolve.outputs.roles }}
+      # ⚠️ THE REST STILL COME FROM `route`, and that split is deliberate. The interception decides
+      # a ROLE; the story, its branch and the issue kind are read from state and are not in doubt —
+      # a model has no business restating them, and letting it would put two sources on one fact.
+      story: ${{ steps.route.outputs.story }}
+      # the branch NAME, not the number — passed to the host action as `base_branch` so an
+      # author's task branch is cut off the story's branch instead of the default one
+      story_branch: ${{ steps.route.outputs.story_branch }}
+      kind: ${{ steps.route.outputs.kind }}
+      # ⚠️ `defaulted` and `reason` are NOT job outputs. They were, for as long as they existed,
+      # with nothing in any job reading either — which is the exact defect #797 fixed one level
+      # down, reproduced one level up. Both are live *step* outputs feeding `resolve` and
+      # `report-route.py` inside this job; a job-level declaration only invites a reader to assume
+      # something gates on them.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # ⚠️ The custodian step below reads issue bodies, which anyone can file. Same reasoning
+          # as the Researcher: `persist-credentials: true` leaves the token in `.git/config` as an
+          # http extraheader, recoverable by anything holding `Read`. Nothing in this job pushes.
+          persist-credentials: false
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      # First real step of every run: the 👀 lands before anything has thought about it.
+      - name: Acknowledge the trigger
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          # ⚠️ issue_comment only. A review comment's id belongs to the *pulls* comments
+          # collection, and acknowledge.py reacts via `issues/comments/<id>` — passing one
+          # here reacts to an unrelated comment or 404s. Empty falls back to the PR itself,
+          # which is an issue as far as the reactions API is concerned.
+          COMMENT_ID: ${{ github.event_name == 'issue_comment' && github.event.comment.id || '' }}
+        run: "$RUNNER_TEMP/agent-bin/acknowledge.py"
+      - id: route
+        name: Pick the role
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          # empty on a label trigger — that is what sends delegate.py past rule 1 into
+          # reading issue state, which is the whole point of the label path
+          COMMENT_BODY: ${{ github.event.comment.body || github.event.review.body }}
+          # `issues` never fires for a PR (labelling one is a `pull_request` event), so the
+          # only PR path in is a comment or review.
+          IS_PR: ${{ (github.event.issue.pull_request || github.event_name == 'pull_request_review_comment' || github.event_name == 'pull_request_review') && 'true' || 'false' }}
+        run: "$RUNNER_TEMP/agent-bin/delegate.py"
+
+      # ── The interception ──────────────────────────────────────────────────────────
+      # Where `delegate.py` had to guess, ask the root role before running the guess.
+      #
+      # ⚠️ A STEP IN THIS JOB, and each of the three alternatives is ruled out by something this
+      # repo has already paid for:
+      #   - a new workflow run — an event created with `GITHUB_TOKEN` starts nothing, by design.
+      #   - a job the roles `needs:` — a job needing a SKIPPED job reports cancelled, which is
+      #     exactly the noise #430 reverted; this would skip on every non-defaulted run.
+      #   - a job that `needs: delegate` — too late. The role jobs gate on this job's outputs, so
+      #     by the time it could speak they have already started on the guess.
+      # A job cannot gate on a step inside itself; it CAN gate on an output that step produced.
+      #
+      # ⚠️ THIS DOES NOT MAKE ROUTING A MODEL DECISION. Rules 1-4 are readable state and stay
+      # scripted. This runs only where the state that should have decided is absent — the choice
+      # is not "script or model", it is "read the issue or guess".
+      - id: route-schema
+        name: Load the routing schema
+        if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
+        run: |
+          # same constraints as the handoff and findings schemas: one line, and no single quote,
+          # because it is inlined into a single-quoted claude_args flag
+          body=$(jq -c . packages/claude-team/schemas/route.json)
+          case "$body" in
+            *"'"*) echo "::error::route.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
+          esac
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+          echo "routing schema loaded (${#body} chars)"
+      - id: route-prompt
+        if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
+        uses: ./.github/actions/load-prompt
+        with:
+          role: route
+      - id: custodian
+        name: Ask the root role which role this is
+        if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
+        # ⚠️ A FAILED INTERCEPTION MUST NOT MEAN NOTHING RUNS. The script's default is the floor:
+        # `resolve` falls back to it whenever this step produces no usable answer, and this keeps
+        # the job green so it gets there. Degrading to the old behaviour is the correct failure.
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        env:
+          ISSUE: ${{ github.event.issue.number }}
+          STORY: ${{ steps.route.outputs.story }}
+          # what the script fell back to and why — the model is correcting a specific guess, not
+          # routing from scratch, and saying which one saves it rediscovering the gap
+          ROUTE_DEFAULT: ${{ steps.route.outputs.roles }}
+          ROUTE_REASON: ${{ steps.route.outputs.reason }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ Required, not optional — the same pairing #668 established. It short-circuits
+          # `setupGitHubToken` before OIDC, which is why this job needs no `id-token`; and it is
+          # what makes this job's `permissions:` block bound the agent at all, since the App token
+          # the exchange would otherwise mint is scoped by the service and not by that block.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # ⚠️ NO `track_progress`, and that is the one place this job differs from every other
+          # model step here. With a prompt supplied and no track_progress the action picks AGENT
+          # mode (`src/modes/detector.ts`), which means: our prompt is authoritative rather than
+          # wrapped in the tag-mode framing that tells a model its instructions are the triggering
+          # comment — and there is no triggering comment on a label event anyway — and no tracking
+          # comment is created. The usual objection to agent mode is that losing the tracking
+          # comment loses the maintainer's window into the run; it does not apply to a routing
+          # decision, whose durable record is the comment `report-route.py` writes below. Two
+          # comments for one sub-second decision would be the worse outcome.
+          # ⚠️ `structured_output` is unaffected — `src/entrypoints/run.ts` sets it after the run,
+          # in either mode. Checked in source rather than assumed.
+          prompt: ${{ steps.route-prompt.outputs.body }}
+          # Reads the issue and answers. No Write/Edit: it must not "helpfully" add the missing
+          # `Role:` stamp — a route that rewrote its own input would leave nothing to notice.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,Glob,Grep,Bash(gh:*)"
+            --json-schema '${{ steps.route-schema.outputs.body }}'
+            --max-turns 15
+
+      - id: resolve
+        name: Settle the route
+        # ⚠️ `always()`, because the step above may have failed and this is what falls back.
+        if: always()
+        env:
+          SCRIPT_ROLES: ${{ steps.route.outputs.roles }}
+          SCRIPT_REASON: ${{ steps.route.outputs.reason }}
+          SCRIPT_REMEDY: ${{ steps.route.outputs.remedy }}
+          # empty when the step was skipped, failed, or returned nothing
+          CUSTODIAN: ${{ steps.custodian.outputs.structured_output }}
+        run: |
+          # ⚠️ Reads one field, and CANNOT fail the step. Empty input, unparseable input and a
+          # missing key all come back as the empty string, which is what makes the fallback below
+          # the automatic behaviour rather than something that has to be reached.
+          # ⚠️ jq is captured BEFORE the pipeline rather than inside it. `|| true` at the end of a
+          # pipe guards the last command, not jq — correct today only because the default `run:`
+          # shell is `bash -e` with no `pipefail`, which is not a thing to depend on.
+          # ⚠️ AND IT TRIMS. $GITHUB_OUTPUT is line-oriented so newlines have to go, but a bare
+          # `tr` turns jq's trailing newline into a trailing SPACE — measured: an empty `why` came
+          # back as " ", passed `[ -n ]`, and produced a resolution notice with no reason in it.
+          field() {
+            local raw
+            raw=$(printf '%s' "$CUSTODIAN" | jq -r "$1 // \"\"" 2>/dev/null) || raw=""
+            printf '%s' "$raw" | tr '\n\t' '  ' | sed -e 's/  */ /g' -e 's/^ //' -e 's/ *$//'
+          }
+          # ⚠️ PLURAL: the Delegator may name several roles, in run order, joined by spaces —
+          # downstream gates use contains(), which reads a space-joined list natively.
+          roles_raw=$(printf '%s' "$CUSTODIAN" | jq -r '(.roles // []) | join(" ")' 2>/dev/null) || roles_raw=""
+          roles_raw=$(printf '%s' "$roles_raw" | tr '\n\t' '  ' | sed -e 's/  */ /g' -e 's/^ //' -e 's/ *$//')
+          why=$(field .why)
+          remedy=$(field .remedy)
+
+          # ⚠️ THE ALLOWLIST IS THE SAFETY, not the schema. An enum constrains a well-behaved
+          # model; this constrains the output. `undecided` — the honest answer, and the one the
+          # prompt asks for over a coin flip — falls through here to the script's default, which
+          # is exactly right: it keeps the guess AND the notice that announces it.
+          # ⚠️ KEEP THE RAW ANSWER. The filter below blanks `role`, which makes "the custodian said
+          # undecided", "it named something invalid" and "it answered nothing at all" indis-
+          # tinguishable downstream — and that ambiguity is why #807 sat inert for days looking
+          # correct. Everything needed to tell them apart exists here and was being discarded.
+          raw_role="$roles_raw"
+
+          # ⚠️ `claude` is in the list and is not a no-op: on a bare @claude comment it is the
+          # custodian saying "this is a question, answer it". Each member is filtered against the
+          # allowlist independently; an invalid member is dropped rather than voiding the answer,
+          # and `undecided` is never a member of a real route — alone it means "fall back".
+          role=""
+          for member in $roles_raw; do
+            case "$member" in
+              claude|architect|researcher|implementor|designer|tester|writer) role="$role $member" ;;
+            esac
+          done
+          role=$(printf '%s' "$role" | sed -e 's/^ //')
+
+          if [ -n "$role" ] && [ -n "$why" ]; then
+            {
+              echo "roles=$role"
+              echo "reason=$why"
+              echo "remedy=${remedy:-$SCRIPT_REMEDY}"
+              echo "resolved_by=custodian"
+            } >> "$GITHUB_OUTPUT"
+            echo "resolved by the custodian: $role — $why"
+          else
+            # ⚠️ SAY WHICH FALLBACK THIS IS. Falling back is a legitimate outcome — `undecided` is
+            # an answer the prompt asks for — but "the model declined" and "the model's answer never
+            # arrived" are opposite problems with the same symptom, and this branch reported neither.
+            if [ -z "${CUSTODIAN//[[:space:]]/}" ]; then
+              cause="the interception returned no structured output at all — skipped, failed, or the run produced none"
+            elif [ "$raw_role" = "undecided" ]; then
+              cause="the custodian answered 'undecided' — the issue itself does not say which role owns it"
+            elif [ -z "$raw_role" ]; then
+              cause="the structured output carried no 'roles' field"
+            elif [ -z "$role" ]; then
+              cause="the custodian answered '$raw_role', none of which is a role this repo runs"
+            else
+              cause="the custodian named '$raw_role' but gave no 'why', and a route without a reason is not actionable"
+            fi
+            {
+              echo "roles=$SCRIPT_ROLES"
+              echo "reason=$SCRIPT_REASON"
+              echo "remedy=$SCRIPT_REMEDY"
+              echo "resolved_by=script"
+            } >> "$GITHUB_OUTPUT"
+            echo "resolved by the script: $SCRIPT_ROLES — $SCRIPT_REASON"
+            echo "::notice::routing fell back to the script because $cause"
+            echo "custodian output was ${#CUSTODIAN} chars: $(printf '%s' "$CUSTODIAN" | head -c 200)"
+          fi
+
+      # ⚠️ AFTER `resolve`, never inside `delegate.py`, and that ordering is the fix. Announcing a
+      # default at the moment the script picks it announces it before the root role has been
+      # asked — so an intercepted run posted "I guessed" and then ran something else. The notice
+      # has to describe the decision that actually took effect (#798).
+      - name: Say how this run routed
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          DEFAULTED: ${{ steps.route.outputs.defaulted }}
+          ROLES: ${{ steps.resolve.outputs.roles }}
+          REASON: ${{ steps.resolve.outputs.reason }}
+          REMEDY: ${{ steps.resolve.outputs.remedy }}
+          RESOLVED_BY: ${{ steps.resolve.outputs.resolved_by }}
+          # ⚠️ A consultation is not a gap. `defaulted` means state was missing and the issue needs
+          # fixing; `consult` means someone typed `@claude` and the only open question was whether
+          # they wanted words or work. Announcing every one of those would be noise, so the hook
+          # speaks only when the answer changed what runs.
+          CONSULT: ${{ steps.route.outputs.consult }}
+          SCRIPT_ROLES: ${{ steps.route.outputs.roles }}
+        run: "$RUNNER_TEMP/agent-bin/report-route.py"
+
+      # ⚠️ START THE STORY'S FIRST WAVE. Phase 2 chained task N to task N+1 and never wired the
+      # ignition, so the cascade could continue a story but not begin one (#1095) — the maintainer
+      # still had to hand-label task 1, the exact gesture #31 set out to remove.
+      # ⚠️ Same guards as the authors-job call: `continue-on-error` on the mint plus the token-empty
+      # gate keep it DARK without the App secrets, and the hook never fails a run.
+      # ⚠️ `dispatch-next.py` needs no change for this — it already finds the earliest incomplete
+      # wave and skips anything already carrying the label, so "the first wave" is just the general
+      # case with nothing closed yet.
+      - name: Mint the dispatch token
+        id: shaped-dispatch-token
+        if: always() && steps.route.outputs.dispatch == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DISPATCH_APP_ID }}
+          private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
+      - name: Dispatch the story's first wave
+        if: always() && steps.route.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ steps.shaped-dispatch-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          STORY: ${{ steps.route.outputs.story }}
+          HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
+        run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
+
+      # ⚠️ THE ROUTING STEP WAS THE ONLY MODEL STEP HERE SHIPPING NO TRANSCRIPT, which is why #807
+      # could sit inert for days while every visible signal — green steps, a posted notice, a
+      # plausible role — said it worked. A decision with no record is worse than a channel with no
+      # reader: there is nothing to go back and read.
+      # ⚠️ `route`, not `claude`: this is the interception, a different prompt and contract from the
+      # conversational root role, and `contains()` is substring matching so the two must not share
+      # a name. It collides with no existing AGENT_TRANSCRIPTS value.
+      - name: Capture the routing transcript
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/capture-transcript
+        with:
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'route') }}
+          role: route
+          execution_file: ${{ steps.custodian.outputs.execution_file }}
+          role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
+          bucket: ${{ secrets.AWS_TRANSCRIPTS_BUCKET }}
+          entity: ${{ github.event.issue.number || github.event.pull_request.number }}
+
+  # ── Architect ────────────────────────────────────────────────────────────────
+  # Shapes work so the others can act on it. On an epic it defines the goal and cuts
+  # stories; on a story it researches, rewrites the issue, cuts the branch and creates
+  # tasks. Manager and Researcher merged into this — they were one act split across two
+  # cold starts that each re-read the same issue.
+  # ⚠️ It stops at task creation. It never hands to an author, and never opens a PR.
+  architect:
+    needs: delegate
+    # ⚠️ The `!github.event.issue.pull_request` guard rides the handle arm only. The router
+    # can never pick architect on a PR (rule 2 sends every PR to implementor), but a handle
+    # typed into a PR comment would otherwise start a role written for an epic issue.
+    if: |
+      always() && needs.delegate.result != 'skipped' && (
+        contains(needs.delegate.outputs.roles, 'architect')
+        || (!github.event.issue.pull_request && contains(github.event.comment.body, '@claude/architect'))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      # write purely to push the epic's (empty) integration branch — the prompt
+      # forbids committing to it; this role writes no code
+      contents: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: prompt
+        uses: ./.github/actions/load-prompt
+        with:
+          role: architect
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # No `npm ci`: the Architect reads code to shape work, it doesn't build.
+      - name: Stamp the role label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: architect
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: MODE=stamp "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - id: architect
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          # epic or story, derived from the label and the title. An unprocessed issue is a
+          # story; this is the default the Architect works from, and the triggering comment
+          # is the only thing that overrides it.
+          KIND: ${{ needs.delegate.outputs.kind }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
+          # anything for us — checkContainsTrigger() returns early on `if (prompt) return
+          # true` and we always pass a prompt. Its ONLY effect is that the action extracts
+          # everything AFTER this phrase as "the user request" and yields it as the final
+          # content block, which the CLI scans for a SLASH COMMAND. Set to a bare "@claude",
+          # the comment "@claude/architect do X" extracts as "/architect do X" — dispatched as an
+          # unknown slash command, so the run returns success in ~150ms having never called
+          # the model. Every comment-triggered role was dead this way between #485 and #488.
+          trigger_phrase: "@claude/architect"
+          # ⚠️ THE ACTION MAKES ITS OWN BRANCH AND TELLS THE MODEL TO STAY ON IT (#530). For an
+          # issue trigger it always creates one — there is no way to decline in tag mode — and
+          # then injects "You are already on the correct branch. Do not create a new branch",
+          # which contradicts our prompt. Which instruction wins is down to the model, and it
+          # has gone both ways: #497 pushed to the story branch, #514 pushed 44 turns of work
+          # to `claude/issue-514-…` where nothing looks, reporting success.
+          #
+          # Empty prefix + this template makes that branch `<issue#>-<kebab-title>` — our own
+          # shape. For a task that fully resolves it, since an author cuts any `<task#>-…`
+          # branch it likes. It cannot match a story branch the Architect already named, so
+          # finish-pr.py also reports commits stranded on an unexpected branch.
+          branch_prefix: ""
+          branch_name_template: "{{entityNumber}}-{{description}}"
+          track_progress: true
+          prompt: ${{ steps.prompt.outputs.body }}
+          # Read-and-write-issues only; no build tools needed for shaping an epic.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,Edit,Write,Bash(gh:*),Bash(git:*)"
+            --max-turns 100
+
+      # ⚠️ FIRST of the post-hooks, and the reason branch creation is no longer the model's.
+      # The action mints its branch LOCALLY and never pushes one with no commits — and an
+      # Architect's branch must be empty — so a model obeying the action's "you are already on
+      # the correct branch" left nothing on the remote while reporting the branch as cut.
+      # ⚠️ POST, never pre: the action falls back to `claude/<entity>-<n>-<timestamp>` if the
+      # name it is about to generate already exists remotely, so pushing it up front would
+      # strand the whole run on a branch nobody looks at.
+      - name: Update the story's task order
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # the Architect is triggered ON the story, so the story is the issue itself
+          STORY: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: "$RUNNER_TEMP/agent-bin/log-to-story.py"
+      # ⚠️ Derived from the title the Architect had to write anyway. A `gh` call it was
+      # merely asked to remember is the shape that fails.
+      # ⚠️ CLASSIFICATION labels only — `epic`/`bug`/`story`, what an issue IS. Never a routing label:
+      # those are the maintainer's and are a record of what has run.
+      - name: Label the issue kind
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: MODE=kind "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - name: File the story's sub-issues
+        # ⚠️ `issues` must be here as well as `issue_comment`. The label is now the primary
+        # way an Architect run starts, and keyed to comments alone this hook — the thing that
+        # parents the tasks it just created — never fired on the path that will be used most.
+        if: |
+          always() && (
+            github.event_name == 'issues'
+            || (github.event_name == 'issue_comment' && !github.event.issue.pull_request)
+          )
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: "$RUNNER_TEMP/agent-bin/file-sub-issues.py"
+      # ⚠️ THE ARCHITECT NO LONGER CUTS THE BRANCH, AND THAT IS THE POINT OF #1133. A branch exists
+      # because an AUTHOR is about to work, not because an issue was shaped. Shaping produces
+      # nothing to commit, so a branch cut here sits empty until — and unless — someone is
+      # dispatched to it. The authors job upserts it in its own pre-step, which is the first moment
+      # the branch is actually needed and the only job that passes `base_branch` to the action.
+
+      # ⚠️ THE GATE IS POSITIVE, AND FAILING OPEN HERE STARTED WORK NOBODY ASKED FOR. It read
+      # "not an epic and not a spike", so an UNRESOLVED kind dispatched — and `kind` was set on the
+      # unshaped-issue path only, so an explicit `@claude/<role>` handle emitted `n/a` and sailed
+      # straight through. Measured on #1112: a comment asking the Architect for a task had that task
+      # dispatched to an Implementor a minute later (#1128).
+      # ⚠️ A GUARD THAT STARTS WORK MUST FAIL CLOSED — only a kind positively recognised as workable
+      # proceeds. That also survives `team.kind()` falling back to `story` on a failed API call,
+      # which the negative form could not.
+      # ⚠️ START THE STORY'S FIRST WAVE. Phase 2 chained task N to task N+1 and never wired the
+      # ignition, so the cascade could continue a story but not begin one (#1095) — the maintainer
+      # still had to hand-label task 1, the exact gesture #31 set out to remove.
+      # ⚠️ Same guards as the authors-job call: `continue-on-error` on the mint plus the token-empty
+      # gate keep it DARK without the App secrets, and the hook never fails a run.
+      # ⚠️ `dispatch-next.py` needs no change for this — it already finds the earliest incomplete
+      # wave and skips anything already carrying the label, so "the first wave" is just the general
+      # case with nothing closed yet.
+      - name: Mint the dispatch token
+        id: shaped-dispatch-token
+        if: always() && (needs.delegate.outputs.kind == 'story' || needs.delegate.outputs.kind == 'bug')
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DISPATCH_APP_ID }}
+          private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
+      - name: Dispatch the story's first wave
+        if: always() && (needs.delegate.outputs.kind == 'story' || needs.delegate.outputs.kind == 'bug')
+        env:
+          GH_TOKEN: ${{ steps.shaped-dispatch-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          STORY: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
+        run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
+
+      # ⚠️ AFTER file-sub-issues, which is what makes the children discoverable — this places
+      # them too, and sub_issues() would return nothing if it ran first.
+      # ⚠️ PROJECTS_TOKEN is safe here on the same argument as the authors job: step env is
+      # per-step, so the model step in this job cannot read it.
+      - name: Put the story and its tasks on the board
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          PROJECT_OWNER: "@me"
+          PROJECT_NUMBER: "4"
+          STATUS: "Todo"
+          # never knock an in-flight story back — a re-shape must not undo In Progress
+          ONLY_IF_UNSET: "true"
+          # the tasks it just cut, or an epic's stories
+          INCLUDE_SUB_ISSUES: "true"
+        run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+
+      # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
+      # `always()` so a FAILED run still yields its transcript, which is when you most want one.
+      # ⚠️ Turned on and off at runtime by the AGENT_TRANSCRIPTS repository variable; unset means
+      # off, so this is inert until someone opts in. See .github/actions/capture-transcript.
+      - name: Capture the transcript
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/capture-transcript
+        with:
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'architect') }}
+          role: architect
+          execution_file: ${{ steps.architect.outputs.execution_file }}
+          role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
+          bucket: ${{ secrets.AWS_TRANSCRIPTS_BUCKET }}
+          entity: ${{ github.event.issue.number || github.event.pull_request.number }}
+  # ── @claude: the root role, reached by naming it in a comment ──────────────────
+  # ⚠️ ROUTED, NOT LABELLED. There is no `@claude/claude` handle and no label of its own — the
+  # router sends here (rule 1b) when a comment names `@claude` and no role handle matched. The
+  # `@claude` LABEL still routes to a working role exactly as before; the split is that the label
+  # does the work and a comment talks about it.
+  claude:
+    needs: delegate
+    if: |
+      always() && needs.delegate.result != 'skipped'
+      && contains(needs.delegate.outputs.roles, 'claude')
+    runs-on: ubuntu-latest
+    permissions:
+      # reads to answer, writes only its own reply. No branch, no code.
+      contents: write
+      # ⚠️ Present only so the transcript step can assume the AWS role by OIDC. It does NOT
+      # re-open the OIDC path for GitHub auth — `github_token` below short-circuits that — and
+      # it does not reach the agent: `parse-sdk-options.ts` deletes ACTIONS_ID_TOKEN_REQUEST_*
+      # from the environment it hands the model.
+      id-token: write
+      issues: write
+      # ⚠️ REQUIRED TO ANSWER ON A PR, and its absence is not a degraded run — it is a dead one.
+      # Commenting on a PR goes through the `/issues/{n}/comments` endpoint, but the permission
+      # GitHub checks is `pull-requests`, not `issues`. Without this the action cannot create its
+      # tracking comment, and since that comment IS how a tag-mode run reports, it aborts at setup
+      # before the model is ever called: "Resource not accessible by integration".
+      # ⚠️ This role reaches PRs by design — rule 1b routes a bare `@claude` on a PR here rather
+      # than to an Implementor — so the PR path is the normal case, not an edge.
+      # ⚠️ It does NOT widen what the role may change. Commenting on and labelling a PR is process
+      # state. The Custodian holds DIRECT GIT and `contents: write` by the maintainer's decision
+      # (spec OQ-5): branch management is part of its remit, for convenience. "Authors no code" is
+      # therefore an instructed bound, not a structural one — the captured transcript is its audit,
+      # and `github_token` is passed so this block is what the model's token actually gets.
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # ⚠️ Same reasoning as the Researcher: `persist-credentials: true` leaves the token in
+          # `.git/config` as an http extraheader, recoverable by anything holding `Read`. This role
+          # never pushes, so there is nothing to lose by dropping it.
+          persist-credentials: false
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      - id: prompt
+        uses: ./.github/actions/load-prompt
+        with:
+          role: claude
+      - id: repairs-schema
+        name: Load the repairs schema
+        run: |
+          # same constraints as every other inlined schema: one line, and no single quote
+          body=$(jq -c . packages/claude-team/schemas/repairs.json)
+          case "$body" in
+            *"'"*) echo "::error::repairs.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
+          esac
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+          echo "repairs schema loaded (${#body} chars)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # ⚠️ No role-label stamp. The stamp records "this role has been here" on work; a
+      # conversation is not work, and there is no `@claude/claude` label for it to write.
+      - id: custodian
+        uses: anthropics/claude-code-action@v1
+        env:
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          STORY: ${{ needs.delegate.outputs.story }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ Supplied for the two reasons #668 established: it short-circuits `setupGitHubToken`
+          # before OIDC, so this job needs no `id-token`; and it makes the `permissions:` block
+          # above actually bound the agent, which the App token from the exchange does not.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # ⚠️ The bare handle is correct HERE and nowhere else. The action extracts everything
+          # after the phrase as "the user request" and the CLI scans it for a slash command — which
+          # is why a bare `@claude` breaks the *role* jobs, where `@claude/architect do X` would
+          # extract as `/architect do X`. It cannot happen here: rule 1b only routes to this job
+          # when no role handle matched, so the text after `@claude` is prose.
+          trigger_phrase: "@claude"
+          # ⚠️ Load-bearing for the ANSWER, not just for progress. Tag mode gives this role its
+          # tracking comment, and with `--json-schema` below the final message is JSON — so the
+          # comment is the only place a human ever reads a reply. Dropping track_progress here
+          # would leave every question answered into a machine-readable void.
+          track_progress: true
+          prompt: ${{ steps.prompt.outputs.body }}
+          # ⚠️ THIS LIST IS WHAT MAKES "NEVER TOUCHES CONTENT" TRUE (#799). The remit is process
+          # state only, and the acceptance criterion was that it be enforced by what the role can
+          # *reach* rather than by its prompt — so every verb here is read-only and the repairs go
+          # through `apply-repairs.py`, whose repertoire is a fixed enum.
+          #
+          # ⚠️ `Bash(gh:*)` was the old grant and had to go: `gh issue edit --body` rewrites an
+          # issue, which is content. Allowlisted by SUBCOMMAND now, the same way Security is, and
+          # for the same reason — a family grant cannot express "read but do not write".
+          #
+          # ⚠️ `gh api` is deliberately absent: it reaches every endpoint the token has, including
+          # every mutation. Relationships stay readable without it because `gh issue view` exposes
+          # `parent`, `subIssues` and `subIssuesSummary` — checked before narrowing this, since
+          # Security already taught us that too narrow starves a role *silently* (#494).
+          #
+          # ⚠️ Direct git by decision (spec OQ-5): the Custodian manages branches, so the git
+          # family is granted whole and `contents: write` backs it. There is still no
+          # `Write`/`Edit`, so authoring content stays out of reach by construction; what it can do
+          # with git is move refs, and every run's transcript is captured. `github_token` is
+          # passed, so the job's `permissions:` block is what the model's token actually gets.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr diff:*),Bash(gh run view:*),Bash(gh run list:*),Bash(gh label list:*),Bash(git:*)"
+            --json-schema '${{ steps.repairs-schema.outputs.body }}'
+            --max-turns 40
+
+      # ⚠️ THE MODEL PROPOSES, THIS DISPOSES. Deterministic at both ends, the same shape as
+      # post-handoff/post-findings: the schema forces the report, this forces delivery — and here
+      # it also forces the *bound*, since the hook's enum is the whole of what can change.
+      # ⚠️ Step env is per-step, so PROJECTS_TOKEN here is not readable by the model step above.
+      - name: Apply the process repairs
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          REPO: ${{ github.repository }}
+          PROJECT_OWNER: "@me"
+          PROJECT_NUMBER: "4"
+          REPAIRS: ${{ steps.custodian.outputs.structured_output }}
+          # ⚠️ `unrepairable` findings carry no target of their own — only `what` and `wouldFix` —
+          # so they are reported on whatever triggered the run. Both are passed because the root
+          # role answers on issues AND on PR comments, and each expression blanks for the other.
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          PR: ${{ github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: "$RUNNER_TEMP/agent-bin/apply-repairs.py"
+
+      # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
+      # `always()` so a FAILED run still yields its transcript, which is when you most want one.
+      # ⚠️ Turned on and off at runtime by the AGENT_TRANSCRIPTS repository variable; unset means
+      # off, so this is inert until someone opts in. See .github/actions/capture-transcript.
+      - name: Capture the transcript
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/capture-transcript
+        with:
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'claude') }}
+          role: claude
+          execution_file: ${{ steps.custodian.outputs.execution_file }}
+          role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
+          bucket: ${{ secrets.AWS_TRANSCRIPTS_BUCKET }}
+          entity: ${{ github.event.issue.number || github.event.pull_request.number }}
+
+  # ── Researcher: answers a spike before anything is shaped ──────────────────────
+  # ⚠️ ITS OWN JOB, not a step in `authors`. The authoring job's whole tail — finish-pr.py,
+  # post-handoff.py, the PR label — assumes a run that produced a PR. A Researcher produces a
+  # recommendation and nothing else, so sharing that job would mean gating every one of those
+  # steps off it. It sits closer to the Architect: shapes nothing, ships nothing, writes an issue.
+  researcher:
+    needs: delegate
+    # the same PR guard the Architect carries on its handle arm: `issue_comment` fires for PRs
+    # too, and a spike is never a PR.
+    if: |
+      always() && needs.delegate.result != 'skipped' && (
+        contains(needs.delegate.outputs.roles, 'researcher')
+        || (!github.event.issue.pull_request && contains(github.event.comment.body, '@claude/researcher'))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      # ⚠️ contents READ, unlike every authoring role and unlike the Architect. A spike ships
+      # nothing and has no branch to cut.
+      contents: read
+      # ⚠️ Present only so the transcript step can assume the AWS role by OIDC. It does NOT
+      # re-open the OIDC path for GitHub auth — `github_token` below short-circuits that — and
+      # it does not reach the agent: `parse-sdk-options.ts` deletes ACTIONS_ID_TOKEN_REQUEST_*
+      # from the environment it hands the model.
+      id-token: write
+      issues: write
+      # ⚠️ NO `id-token`, unlike every other role here — which is only possible because this job
+      # passes `github_token` below. The action needs OIDC to mint its own App token; removing
+      # the permission without supplying a token broke the role outright (#668). Supplying one
+      # skips that path, and is also what makes the two lines above bound the agent at all.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # ⚠️ THE ONLY CHECKOUT HERE THAT SETS THIS, and it closes a hole the "no shell" rule
+          # does not. `actions/checkout` defaults to `persist-credentials: true`, which leaves the
+          # token in `.git/config` as an `http.<host>.extraheader` — so an agent with nothing but
+          # `Read` can recover a live credential from a FILE, no command execution required, and
+          # then post it anywhere with WebFetch. Removing Bash was necessary and, on its own, not
+          # sufficient (#669).
+          #
+          # Safe to disable here because nothing in this job uses git after checkout: the model
+          # only reads, and the hooks authenticate through `gh` with a token from their own step
+          # env. ⚠️ Do NOT copy this to the authoring jobs — they push, and it would break them.
+          persist-credentials: false
+      - id: prompt
+        uses: ./.github/actions/load-prompt
+        with:
+          role: researcher
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      # ⚠️ NO `npm ci`, and no build of any kind. See the tool grant below: this role holds no
+      # shell, so there is nothing for installed dependencies to be run by.
+      - id: findings-schema
+        name: Load the findings schema
+        run: |
+          # same constraints as the handoff schema: one line, and no single quote, because it is
+          # inlined into a single-quoted claude_args flag
+          body=$(jq -c . packages/claude-team/schemas/findings.json)
+          case "$body" in
+            *"'"*) echo "::error::findings.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
+          esac
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+          echo "findings schema loaded (${#body} chars)"
+      - name: Stamp the role label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: researcher
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: MODE=stamp "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - id: research
+        uses: anthropics/claude-code-action@v1
+        env:
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          KIND: ${{ needs.delegate.outputs.kind }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ THE ONE ROLE THAT PASSES ITS OWN TOKEN, and it does two jobs at once.
+          #
+          # 1. It is what lets this job run without `id-token: write`. Left unset,
+          #    `setupGitHubToken()` mints an OIDC token and exchanges it for a GitHub App token —
+          #    so dropping the permission broke the role outright ("Could not fetch an OIDC
+          #    token"), the first run after #665 (#668). Set, `OVERRIDE_GITHUB_TOKEN` short-
+          #    circuits that path before OIDC is ever reached.
+          #
+          # 2. ⚠️ It is what makes the `permissions:` block above actually govern the agent. That
+          #    block scopes `secrets.GITHUB_TOKEN`; it does NOT scope the App token the exchange
+          #    mints, whose grants come from the service (`DEFAULT_PERMISSIONS` there is
+          #    `contents: write`). And `run.ts` puts whichever token it ended up with into
+          #    `process.env.GH_TOKEN`. So without this input, `contents: read` constrains the
+          #    hooks and not the model — which is the opposite of what it is there for, since the
+          #    hooks are the trusted half.
+          #
+          # ⚠️ Every other role still takes the App-token path, so their `permissions:` blocks do
+          # not bound what their agent holds either. That is a much smaller problem — their input
+          # is issues the maintainer shaped — but it is not zero, and it is not what those blocks
+          # look like they say.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # the exact handle — see the Architect's job for why a bare "@claude" kills the run
+          trigger_phrase: "@claude/researcher"
+          branch_prefix: ""
+          branch_name_template: "{{entityNumber}}-{{description}}"
+          track_progress: true
+          prompt: ${{ steps.prompt.outputs.body }}
+          # ⚠️ WebSearch/WebFetch are granted HERE AND NOWHERE ELSE, and that is deliberate.
+          # Most spikes turn on facts the repo does not contain — what a platform supports, what
+          # something costs, what changed last year — so without them this role can only report
+          # what is already known, which is the half nobody needed a run for.
+          #
+          # ⚠️ WHICH IS WHY IT HAS NO SHELL. This is the only role whose input is arbitrary
+          # third-party web content, so it is the only one where a prompt injection has an author.
+          # It shipped briefly with Bash(npm|npx|gh|git:*) and that was a live token-exfiltration
+          # path (#665): `npx <anything>` runs third-party code, and WebFetch is itself the egress.
+          #
+          # ⚠️ TAKING THE SECRET AWAY IS NOT AVAILABLE — the first fix attempted, and it does not
+          # work. The action re-injects it whatever this step declares:
+          #     src/entrypoints/run.ts        process.env.GITHUB_TOKEN = githubToken
+          #                                   process.env.GH_TOKEN     = githubToken
+          #     base-action/parse-sdk-options handed the agent as {...process.env}
+          # so GH_TOKEN *and* CLAUDE_CODE_OAUTH_TOKEN — an account credential, not a repo-scoped
+          # one — are both reachable by anything the agent can execute. What can be removed is the
+          # ability to execute. No shell, no read, and the credentials sit inert.
+          #
+          # ⚠️ Narrowing rather than removing would not have held either: `Write` plus any runner
+          # is agent-authored code, so a probe spec IS arbitrary execution. There is no `Write`
+          # here for the same reason.
+          #
+          # ⚠️ The residual, written down rather than claimed away: the action's base allowlist
+          # unions in Bash(git add|commit|rm:*) and git-push.sh and they cannot be removed from
+          # here. Two things neuter them, and the second is the one that actually holds: there is
+          # no `Write`, so the agent cannot author a file worth committing; and `contents: read`
+          # bounds the token — but ONLY because `github_token` is passed below. Stated without
+          # that caveat once already, and it was wrong about which token it described.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,WebSearch,WebFetch"
+            --json-schema '${{ steps.findings-schema.outputs.body }}'
+            --max-turns 80
+
+      # ⚠️ THE ONLY WAY THE FINDINGS REACH ANYONE. The role has no shell, so it cannot run `gh`
+      # and cannot write its own results anywhere. Deterministic at both ends, the same shape as
+      # post-handoff.py: the schema forces the model to produce it, this forces delivery.
+      # ⚠️ Step env is per-step, so the token here is not the one the model step held.
+      - name: Post the findings to the spike
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          FINDINGS: ${{ steps.research.outputs.structured_output }}
+        run: "$RUNNER_TEMP/agent-bin/post-findings.py"
+      # ⚠️ NO BRANCH STEP HERE EITHER. The Researcher answers a question and ships no code, so it is
+      # not an author and nothing about it should create a ref. This used to call the branch hook
+      # purely to log that a spike needs none; that is a sentence, not a mechanism, and the rule is
+      # now legible from the workflow itself — only the authors job touches branches.
+      - name: Label the issue kind
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: MODE=kind "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      # ⚠️ ONLY_IF_UNSET, and no sub-issues: a spike has none, and a re-run on one already In
+      # Progress must not knock it back to Todo.
+      - name: Put the spike on the board
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          PROJECT_OWNER: "@me"
+          PROJECT_NUMBER: "4"
+          STATUS: "Todo"
+          ONLY_IF_UNSET: "true"
+        run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+
+      # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
+      # `always()` so a FAILED run still yields its transcript, which is when you most want one.
+      # ⚠️ Turned on and off at runtime by the AGENT_TRANSCRIPTS repository variable; unset means
+      # off, so this is inert until someone opts in. See .github/actions/capture-transcript.
+      - name: Capture the transcript
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/capture-transcript
+        with:
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'researcher') }}
+          role: researcher
+          execution_file: ${{ steps.research.outputs.execution_file }}
+          role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
+          bucket: ${{ secrets.AWS_TRANSCRIPTS_BUCKET }}
+          entity: ${{ github.event.issue.number || github.event.pull_request.number }}
+  # ── Authors: Implementor | Designer | Tester | Writer ──────────────────────────
+  # The four authoring roles as gated steps in one job. ⚠️ EXACTLY ONE RUNS PER TRIGGER —
+  # `delegate.py` emits a single role, and each step gates on it. They share a job to share
+  # its setup (checkout, prompts, npm ci), not to run in sequence.
+  #
+  # Implementor and Designer are alternatives, split on the package a task touches. The
+  # Tester and the Writer are each triggered by their own task, cut PER STORY and ordered
+  # after the authoring ones — the Tester's when the story warrants it, the Writer's always,
+  # because the evidence for needing one (`docsCandidates`) does not exist yet when the
+  # Architect is shaping tasks (#555).
+  #
+  # ⚠️ DO NOT REACH FOR `needs:` BETWEEN THESE STEPS if the chain idea returns. #430 tried
+  # role chaining across jobs: the followers sat queued behind every run, and a job that
+  # skips after waiting reports as cancelled, so the history filled with cancelled entries.
+  # (The one `needs:` in this file, on `delegate`, is a different case — see the header.)
+  #
+  # ⚠️ AND #500 IS WHY CHAINING DID NOT SIMPLY MOVE HERE. As steps the job graph problem
+  # goes away, but `delegate.py` emits one role, so the steps never co-fired and the
+  # `structured_output` handoff between them never had a consumer — shipped, closed, and
+  # dead for both #475 and #476. The handoff now travels by comment (`post-handoff.py`)
+  # precisely so roles do NOT have to share a run to hand off.
+  #
+  # ⚠️ BUDGET is per role, not cumulative, because only one runs: opus 80 for an author,
+  # sonnet 80 for the Tester, sonnet 80 for the Writer. The Writer was briefly 120 for an
+  # epic-wide read that this repo does not need — stories merge one at a time, so a later
+  # story already carries the previous one's docs and there is no cross-story conflict to
+  # defer around.
+  #
+  # ⚠️ EACH ROLE GETS ITS OWN TRACKING COMMENT, because `use_sticky_comment` is not set —
+  # the action reuses a comment only when it is. That is what keeps the Implementor's
+  # handoff readable after the Tester and Writer have run; sticky would overwrite it with
+  # the next role's and destroy the thing the chain exists to pass along.
+  #
+  # ⚠️ EACH ROLE STAMPS ITS LABEL BEFORE ITS OWN MODEL STEP, not all three up front. A run
+  # that dies in the Tester should read as "implementor and tester were here", not as a
+  # Writer that never started.
+  #
+  # ⚠️ THE POST-HOOKS RUN ONCE, AT THE END. Three copies would relabel and re-check the
+  # same PR three times.
+  #
+  # ⚠️ `base_branch` IS WHY THE AUTHORS NO LONGER FIGHT THE ACTION OVER BRANCHES. A task's
+  # branch must be cut off its STORY's branch; left unset the action cuts from the default
+  # branch and then injects "You are already on the correct branch. Do not create a new
+  # branch", contradicting the prompt telling the model to re-cut it — a coin flip we lost
+  # about half the time (#530, #570). Setting it makes the action's own branch the correct
+  # one, so the two instructions agree instead of competing.
+  #
+  # It arrives from `delegate.py`, which already parses the story's Branch line to derive the
+  # story number and now emits the string beside it. Empty is falsy in `setupBranch`
+  # (`if (baseBranch) { sourceBranch = baseBranch }`), so an unresolvable story degrades to
+  # the old behaviour rather than breaking. On a PR trigger the action checks out the PR's own
+  # branch and never reads this at all.
+  authors:
+    needs: delegate
+    if: |
+      always() && needs.delegate.result != 'skipped' && (
+        contains(needs.delegate.outputs.roles, 'implementor')
+        || contains(needs.delegate.outputs.roles, 'designer')
+        || contains(needs.delegate.outputs.roles, 'tester')
+        || contains(needs.delegate.outputs.roles, 'writer')
+        || contains(github.event.comment.body, '@claude/implementor')
+        || contains(github.event.comment.body, '@claude/designer')
+        || contains(github.event.comment.body, '@claude/tester')
+        || contains(github.event.comment.body, '@claude/writer')
+        || contains(github.event.review.body, '@claude/implementor')
+        || contains(github.event.review.body, '@claude/designer')
+        || contains(github.event.review.body, '@claude/tester')
+        || contains(github.event.review.body, '@claude/writer')
+      )
+    runs-on: ubuntu-latest
+    # ⚠️ A backstop for every step, model steps included — a hung API call has no step guard, and
+    # the longest healthy run observed is ~15 minutes. Without this a hang burns the 6-hour ceiling.
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      # lets Claude read the Verify workflow's logs when a PR gate goes red
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # full history so it can branch from and diff against mainline
+          fetch-depth: 0
+      # All three prompts load up front, while the tree is still the default branch — the
+      # same reason the hooks are stashed. A model step checks out a feature branch, and by
+      # the Writer's turn the tree is whatever the Implementor left.
+      - id: p_implementor
+        uses: ./.github/actions/load-prompt
+        with:
+          role: implementor
+      - id: p_designer
+        uses: ./.github/actions/load-prompt
+        with:
+          role: designer
+      - id: p_tester
+        uses: ./.github/actions/load-prompt
+        with:
+          role: tester
+      - id: p_writer
+        uses: ./.github/actions/load-prompt
+        with:
+          role: writer
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+
+      # The handoff contract lives in packages/claude-team so a second repo gets it
+      # unchanged, but `--json-schema` takes INLINE JSON, not a path — so the file is
+      # compacted to one line here and injected into claude_args below. Same shape as
+      # load-prompt: the file is the source of truth, the workflow only carries it.
+      # ⚠️ Loaded here, before any model step, for the usual reason — a `run:` reads the
+      # working tree and the model switches branches partway through.
+      - id: schema
+        name: Load the handoff schema
+        run: |
+          # ⚠️ claude_args is line-parsed, so the schema must be ONE line; and it is wrapped
+          # in single quotes there, so it must contain none. Fail loudly rather than emit a
+          # value that would mangle every flag after it.
+          body=$(jq -c . packages/claude-team/schemas/handoff.json)
+          case "$body" in
+            *"'"*) echo "::error::handoff.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
+          esac
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+          echo "handoff schema loaded (${#body} chars)"
+
+      # Resolved once, read by every gate below — otherwise the same condition appears
+      # nine times and drifts.
+      # ⚠️ The comment body arrives as ENV and is never interpolated into the script. A
+      # `${{ }}` holding attacker-controllable text inside a `run:` block is a shell
+      # injection hole; `$COMMENT` in a `case` pattern is inert.
+      - id: roles
+        name: Resolve the roles for this run
+        env:
+          ROUTED: ${{ needs.delegate.outputs.roles }}
+          COMMENT: ${{ github.event.comment.body || github.event.review.body }}
+        run: |
+          list=""
+          for r in implementor designer tester writer; do
+            case " $ROUTED " in
+              *"$r"*) list="$list $r"; continue ;;
+            esac
+            case "$COMMENT" in
+              *"@claude/$r"*) list="$list $r" ;;
+            esac
+          done
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "roles for this run:${list:- none}"
+
+      # Install as workflow steps, not from inside a run: this costs Claude zero turns, and
+      # without it `tsc` resolves to the runner image's global TypeScript (a different
+      # major) and fails on config this repo pins as valid. The Writer is in this list too:
+      # a backfill spec describes a screen that already exists, so it has to drive the app.
+      - if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        timeout-minutes: 10
+        run: npm ci
+      # Browser install as a workflow step, not a Claude turn. Without it the Tester can
+      # write specs but never run them, and an unrun test is worse than no test.
+      # ⚠️ The Writer needs it for the same reason it needs `npm ci`, and needs it SEPARATELY:
+      # `npm ci` installs the playwright package, never a browser binary. Under CI
+      # `playwright.config.ts` sets no channel and uses the bundled chromium, so without this
+      # step a Writer reaches a running dev server and then dies on a missing executable —
+      # which reads as "cannot verify" rather than as a failure (#1012, and see packages/e2e).
+      # ⚠️ ALL FOUR AUTHORS: the spec grants every author the ability to run the app and view it,
+      # and an acceptance criterion asking for a browser check is unfulfillable without a binary —
+      # #1037's Implementor reported exactly that. Same accepted trade as the Writer's grant:
+      # every author run pays the download, and most never open a browser.
+      # ⚠️ TIMED OUT ON PURPOSE, both this and `npm ci` above. `--with-deps` runs apt-get and then
+      # pulls chromium from Playwright's CDN, and either can stall forever on a bad mirror — three
+      # runs hung here for hours in one night, each headed for GitHub's 6-hour ceiling, and the
+      # UI's cancel was ignored (only force-cancel killed them). Healthy runs take ~1-2 minutes;
+      # a timeout here fails BEFORE any model runs, so a re-trigger is cheap (#1175).
+      - id: pw-version
+        if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        run: echo "version=$(jq -r '.packages["node_modules/@playwright/test"].version' package-lock.json)" >> "$GITHUB_OUTPUT"
+      - id: pw-cache
+        if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+      # ⚠️ SKIPPED ENTIRELY ON A CACHE HIT, apt included — ubuntu-latest ships chromium's OS
+      # dependencies, and apt is the half that hung three runs (#1175). Fallback if an image
+      # update ever breaks a launch: `npx playwright install-deps chromium` on hit (#1179).
+      - if: (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')) && steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 10
+        run: npx playwright install --with-deps chromium
+
+      # ⚠️ THE STORY BRANCH MUST EXIST BEFORE ANY MODEL STEP, and until #777 nothing guaranteed
+      # it on this path. `setupBranch` resolves the base branch first of all —
+      #     const sourceBranchRef = await octokits.rest.git.getRef({ ref: `heads/${sourceBranch}` })
+      # — so a `base_branch` naming a missing ref is a 404 and the job dies in ~3s, before the
+      # model is ever called.
+      #
+      # ⚠️ It went missing because the hook that creates it was wired POST-ARCHITECT ONLY, while
+      # `delegate.py` rule 4 routes straight to the stamped role whenever a `Branch:` line is
+      # present. An issue filed with both routing lines already written — which is what a good
+      # agent-filed bug looks like — therefore skips the Architect and never gets a branch (#744).
+      #
+      # Idempotent by construction: the hook only ever handles the absent case and never touches
+      # an existing branch, so this is a guarantee rather than a second creation path.
+      #
+      # ⚠️ KIND is deliberately unset here. `delegate.py` only emits it on the Architect path, and
+      # the hook skips epics and spikes by that value — neither of which ever reaches an author.
+      - name: Navigate the story's branch
+        if: steps.roles.outputs.list != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: "$RUNNER_TEMP/agent-bin/branch-navigation.py"
+
+      # ⚠️ ANY role that ran, not the three that build. This shared the `npm ci` gate, which
+      # is correct there — the Writer compiles nothing — and wrong here: a Writer's task is as
+      # much in progress as any other, so it sat in its original column for the whole run and
+      # then jumped to Done on merge. The two conditions look alike and mean different things;
+      # "does this role build" is not "is this role working". Keep them separate.
+      - name: Move the issue to In Progress
+        if: steps.roles.outputs.list != ''
+        env:
+          # ⚠️ PROJECTS_TOKEN is safe here and only here: step env is per-step, so the model
+          # steps below cannot read it. See the Owner post-mortem in CLAUDE.md.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          PROJECT_OWNER: "@me"
+          PROJECT_NUMBER: "4"
+          STATUS: "In Progress"
+        run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+
+      # ── Implementor ──
+      # The main engineer. Executes issues and handles follow-up engineering (bug fixes,
+      # requested changes, merge-conflict resolution). Reads the issue + its comments (and,
+      # on a PR, the description + current comments) for context before touching code.
+      # Deliverable is code + a PR against mainline.
+      - name: Stamp the Implementor label
+        if: contains(steps.roles.outputs.list, 'implementor')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: implementor
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: MODE=stamp "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - name: Implementor
+        id: implementor
+        if: contains(steps.roles.outputs.list, 'implementor')
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STORY: ${{ needs.delegate.outputs.story }}
+          # the issue that actually triggered this run — the role's brief. Empty on a PR
+          # trigger, where $STORY is the one to read.
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
+          # anything for us — checkContainsTrigger() returns early on `if (prompt) return
+          # true` and we always pass a prompt. Its ONLY effect is that the action extracts
+          # everything AFTER this phrase as "the user request" and yields it as the final
+          # content block, which the CLI scans for a SLASH COMMAND. Set to a bare "@claude",
+          # the comment "@claude/implementor do X" extracts as "/implementor do X" — dispatched as an
+          # unknown slash command, so the run returns success in ~150ms having never called
+          # the model. Every comment-triggered role was dead this way between #485 and #488.
+          trigger_phrase: "@claude/implementor"
+          # ⚠️ THE ACTION MAKES ITS OWN BRANCH AND TELLS THE MODEL TO STAY ON IT (#530). For an
+          # issue trigger it always creates one — there is no way to decline in tag mode — and
+          # then injects "You are already on the correct branch. Do not create a new branch",
+          # which contradicts our prompt. Which instruction wins is down to the model, and it
+          # has gone both ways: #497 pushed to the story branch, #514 pushed 44 turns of work
+          # to `claude/issue-514-…` where nothing looks, reporting success.
+          #
+          # Empty prefix + this template makes that branch `<issue#>-<kebab-title>` — our own
+          # shape. For a task that fully resolves it, since an author cuts any `<task#>-…`
+          # branch it likes. It cannot match a story branch the Architect already named, so
+          # finish-pr.py also reports commits stranded on an unexpected branch.
+          # a task branch is cut off its STORY branch, not the default one — see the job
+          # header. Empty when no story resolves, which falls back to the default branch.
+          base_branch: ${{ needs.delegate.outputs.story_branch }}
+          branch_prefix: ""
+          branch_name_template: "{{entityNumber}}-{{description}}"
+          track_progress: true
+          prompt: ${{ steps.p_implementor.outputs.body }}
+          # Allowlist by *family*, not per-subcommand. Deliberately NOT bare `Bash`: this
+          # runner carries GH_TOKEN and the Claude OAuth token in env, and arbitrary shell
+          # could exfiltrate them. Only write-access actors can trigger a run.
+          # ⚠️ --json-schema makes the Implementor's final message the handoff contract, and
+          # the action exposes it as `structured_output` for the two steps below. Prose
+          # sections a later role has to find and parse are the shape that failed for
+          # sub-issue filing: a consumer cannot tell "nothing to report" from "forgot".
+          claude_args: |
+            --model opus
+            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+            --max-turns 80
+            --json-schema '${{ steps.schema.outputs.body }}'
+
+      # ── Designer ──
+      # The Implementor of the design system. Same shape — branch, PR, gate, handoff — with
+      # the design package as its subject instead of the code that consumes it.
+      #
+      # ⚠️ The boundary is the PACKAGE, not a judgement call, so it can be checked rather
+      # than negotiated. A task that changes a primitive *and* its call sites is two tasks,
+      # and the Architect cuts it in two; the prompt tells the Designer to say so and stop
+      # rather than reach across.
+      #
+      # ⚠️ Implementor and Designer are alternatives, not a sequence — a task is one or the
+      # other. Both emit the same handoff schema, so whichever ran feeds the Tester and
+      # Writer below.
+      - name: Stamp the Designer label
+        if: contains(steps.roles.outputs.list, 'designer')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: designer
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: MODE=stamp "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - name: Designer
+        id: designer
+        if: contains(steps.roles.outputs.list, 'designer')
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STORY: ${{ needs.delegate.outputs.story }}
+          # the issue that actually triggered this run — the role's brief. Empty on a PR
+          # trigger, where $STORY is the one to read.
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
+          # anything for us — checkContainsTrigger() returns early on `if (prompt) return
+          # true` and we always pass a prompt. Its ONLY effect is that the action extracts
+          # everything AFTER this phrase as "the user request" and yields it as the final
+          # content block, which the CLI scans for a SLASH COMMAND. Set to a bare "@claude",
+          # the comment "@claude/designer do X" extracts as "/designer do X" — dispatched as an
+          # unknown slash command, so the run returns success in ~150ms having never called
+          # the model. Every comment-triggered role was dead this way between #485 and #488.
+          trigger_phrase: "@claude/designer"
+          # ⚠️ THE ACTION MAKES ITS OWN BRANCH AND TELLS THE MODEL TO STAY ON IT (#530). For an
+          # issue trigger it always creates one — there is no way to decline in tag mode — and
+          # then injects "You are already on the correct branch. Do not create a new branch",
+          # which contradicts our prompt. Which instruction wins is down to the model, and it
+          # has gone both ways: #497 pushed to the story branch, #514 pushed 44 turns of work
+          # to `claude/issue-514-…` where nothing looks, reporting success.
+          #
+          # Empty prefix + this template makes that branch `<issue#>-<kebab-title>` — our own
+          # shape. For a task that fully resolves it, since an author cuts any `<task#>-…`
+          # branch it likes. It cannot match a story branch the Architect already named, so
+          # finish-pr.py also reports commits stranded on an unexpected branch.
+          # a task branch is cut off its STORY branch, not the default one — see the job
+          # header. Empty when no story resolves, which falls back to the default branch.
+          base_branch: ${{ needs.delegate.outputs.story_branch }}
+          branch_prefix: ""
+          branch_name_template: "{{entityNumber}}-{{description}}"
+          track_progress: true
+          prompt: ${{ steps.p_designer.outputs.body }}
+          claude_args: |
+            --model opus
+            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+            --max-turns 80
+            --json-schema '${{ steps.schema.outputs.body }}'
+
+      # ── Tester ──
+      # Owns packages/e2e. The Implementor ships behaviour and reports Testing notes; the
+      # Tester turns those into Playwright specs. Split because the two pull in opposite
+      # directions — an engineer finishing a feature writes the test that passes, and the
+      # failure mode this repo actually has (a save that throws inside a fire-and-forget
+      # call while lint/tsc/build stay green) is only caught by a test written to distrust
+      # the change.
+      - name: Stamp the Tester label
+        if: contains(steps.roles.outputs.list, 'tester')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: tester
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: MODE=stamp "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - name: Tester
+        id: tester
+        if: contains(steps.roles.outputs.list, 'tester')
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STORY: ${{ needs.delegate.outputs.story }}
+          # the issue that actually triggered this run — the role's brief. Empty on a PR
+          # trigger, where $STORY is the one to read.
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
+          # anything for us — checkContainsTrigger() returns early on `if (prompt) return
+          # true` and we always pass a prompt. Its ONLY effect is that the action extracts
+          # everything AFTER this phrase as "the user request" and yields it as the final
+          # content block, which the CLI scans for a SLASH COMMAND. Set to a bare "@claude",
+          # the comment "@claude/tester do X" extracts as "/tester do X" — dispatched as an
+          # unknown slash command, so the run returns success in ~150ms having never called
+          # the model. Every comment-triggered role was dead this way between #485 and #488.
+          trigger_phrase: "@claude/tester"
+          # ⚠️ THE ACTION MAKES ITS OWN BRANCH AND TELLS THE MODEL TO STAY ON IT (#530). For an
+          # issue trigger it always creates one — there is no way to decline in tag mode — and
+          # then injects "You are already on the correct branch. Do not create a new branch",
+          # which contradicts our prompt. Which instruction wins is down to the model, and it
+          # has gone both ways: #497 pushed to the story branch, #514 pushed 44 turns of work
+          # to `claude/issue-514-…` where nothing looks, reporting success.
+          #
+          # Empty prefix + this template makes that branch `<issue#>-<kebab-title>` — our own
+          # shape. For a task that fully resolves it, since an author cuts any `<task#>-…`
+          # branch it likes. It cannot match a story branch the Architect already named, so
+          # finish-pr.py also reports commits stranded on an unexpected branch.
+          # a task branch is cut off its STORY branch, not the default one — see the job
+          # header. Empty when no story resolves, which falls back to the default branch.
+          base_branch: ${{ needs.delegate.outputs.story_branch }}
+          branch_prefix: ""
+          branch_name_template: "{{entityNumber}}-{{description}}"
+          track_progress: true
+          # ⚠️ NO handoff is appended here. Only one role runs per trigger (#500), so an
+          # author's `structured_output` is never available to this step — it would always
+          # render an empty fenced block and contradict the prompt, which sends the Tester to
+          # the Handoff comments on the story's ISSUE instead.
+          prompt: ${{ steps.p_tester.outputs.body }}
+          claude_args: |
+            --model sonnet
+            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*)"
+            --max-turns 80
+
+      # ── Writer ──
+      # The tech writer. Owns documentation: every CLAUDE.md, the agent instruction files
+      # under .claude/skills, and anything else whose job is to explain rather than run.
+      #
+      # ⚠️ Split out because CLAUDE.md was the single biggest source of merge conflicts —
+      # every role edited it, so two branches touching the same package collided on prose
+      # neither was really working on. Implementor and Tester report what needs documenting
+      # and change no docs themselves.
+      - name: Stamp the Writer label
+        if: contains(steps.roles.outputs.list, 'writer')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ROLE: writer
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: MODE=stamp "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+      - name: Writer
+        id: writer
+        if: contains(steps.roles.outputs.list, 'writer')
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STORY: ${{ needs.delegate.outputs.story }}
+          # the issue that actually triggered this run — the role's brief. Empty on a PR
+          # trigger, where $STORY is the one to read.
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
+          # anything for us — checkContainsTrigger() returns early on `if (prompt) return
+          # true` and we always pass a prompt. Its ONLY effect is that the action extracts
+          # everything AFTER this phrase as "the user request" and yields it as the final
+          # content block, which the CLI scans for a SLASH COMMAND. Set to a bare "@claude",
+          # the comment "@claude/writer do X" extracts as "/writer do X" — dispatched as an
+          # unknown slash command, so the run returns success in ~150ms having never called
+          # the model. Every comment-triggered role was dead this way between #485 and #488.
+          trigger_phrase: "@claude/writer"
+          # ⚠️ THE ACTION MAKES ITS OWN BRANCH AND TELLS THE MODEL TO STAY ON IT (#530). For an
+          # issue trigger it always creates one — there is no way to decline in tag mode — and
+          # then injects "You are already on the correct branch. Do not create a new branch",
+          # which contradicts our prompt. Which instruction wins is down to the model, and it
+          # has gone both ways: #497 pushed to the story branch, #514 pushed 44 turns of work
+          # to `claude/issue-514-…` where nothing looks, reporting success.
+          #
+          # Empty prefix + this template makes that branch `<issue#>-<kebab-title>` — our own
+          # shape. For a task that fully resolves it, since an author cuts any `<task#>-…`
+          # branch it likes. It cannot match a story branch the Architect already named, so
+          # finish-pr.py also reports commits stranded on an unexpected branch.
+          # a task branch is cut off its STORY branch, not the default one — see the job
+          # header. Empty when no story resolves, which falls back to the default branch.
+          base_branch: ${{ needs.delegate.outputs.story_branch }}
+          branch_prefix: ""
+          branch_name_template: "{{entityNumber}}-{{description}}"
+          track_progress: true
+          # ⚠️ NO handoff appended — same reason as the Tester. The Writer reads the Handoff
+          # comments on its own story's ISSUE, on its own trigger.
+          prompt: ${{ steps.p_writer.outputs.body }}
+          # ⚠️ `npm`/`npx` because a SPECIFICATION IS WRITTEN BY DRIVING THE APP. The Writer states
+          # what a brewer can do and see, which means starting the dev server and driving Chrome —
+          # `npm run dev -w packages/app`, then Playwright via `npx`. Without them the role is told
+          # to do something it cannot, and burns its budget on permission denials discovering that.
+          # ⚠️ This is the same grant the Tester has, for the same reason: both drive the app.
+          # ⚠️ It breaks no principle. The role that must hold NO shell is the Researcher, because
+          # its input is arbitrary web content and an injection there has an author. The Writer's
+          # input is maintainer-shaped issues — the trust level of every other authoring role.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+            --max-turns 80
+
+      # ── Once, for the job ──
+      # ⚠️ BEFORE finish-pr.py, and the order is load-bearing: the story's PR must not be opened
+      # until the commits it would describe are actually on the branch, or `open-story-pr.py`
+      # finds 0-ahead and correctly declines — leaving the story with no PR until something else
+      # happens to trigger it.
+      # ⚠️ A TASK HAS NO PR. The branch the action minted is a staging area; this commits the
+      # run's changes (message from the author's structured output), lands them on the story
+      # branch, and closes the task. A refused push reconciles by MERGE — pull latest, commit the
+      # merge commit, push — because two tasks of one story can run concurrently (the concurrency
+      # group is keyed on the issue and cannot be keyed on the story, since it is evaluated before
+      # the story is resolved). A merge that CONFLICTS fails the step with `unlandable=true`, the
+      # signal the failure-capture step keys on: a script must not pick a side, and the commits
+      # stay safe on the run's branch.
+      # ⚠️ GATED OFF WHEN A MODEL STEP FAILED — landing half-done work is worse than landing
+      # nothing. The failed run's changes are not lost: the capture step below is the other exit,
+      # and between them every author run ends in a scripted landing or a scripted failure
+      # capture. There is no third exit.
+      - name: Complete the work
+        id: completion
+        if: always() && steps.roles.outputs.list != '' && steps.implementor.outcome != 'failure' && steps.designer.outcome != 'failure' && steps.tester.outcome != 'failure' && steps.writer.outcome != 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          # `remaining` decides whether the task closes — the author's only structured way to say
+          # it did not finish. `commitMessage` names the commit the hook makes.
+          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output }}
+        run: "$RUNNER_TEMP/agent-bin/work-completion.py"
+
+      # ⚠️ THE OTHER EXIT. A failed model step or a conflicted landing pushes the run's changes to
+      # `failure/<task#>-<run#>` and reports on the issue — recovery becomes checkout, not
+      # transcript archaeology. It never fails and never masks: the run is already red for the
+      # real reason.
+      - name: Capture the failure
+        if: always() && steps.roles.outputs.list != '' && (steps.implementor.outcome == 'failure' || steps.designer.outcome == 'failure' || steps.tester.outcome == 'failure' || steps.writer.outcome == 'failure' || steps.completion.outputs.unlandable == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          MODEL_FAILED: ${{ (steps.implementor.outcome == 'failure' || steps.designer.outcome == 'failure' || steps.tester.outcome == 'failure' || steps.writer.outcome == 'failure') && 'true' || 'false' }}
+          UNLANDABLE: ${{ steps.completion.outputs.unlandable || 'false' }}
+        run: "$RUNNER_TEMP/agent-bin/capture-failure.py"
+
+      # ⚠️ A TASK REACHES DONE HERE OR NOWHERE. `close-merged-work.py` sets Done from a merged PR,
+      # and a task has none — so before this, every task closed while sitting in In Progress
+      # forever. The story still reaches Done its own way, through its PR.
+      # ⚠️ Gated on `closed`, not on the step succeeding: a task that reported work `remaining` is
+      # deliberately left open, and marching it to Done would erase the one signal saying it is
+      # unfinished.
+      # ⚠️ PROJECTS_TOKEN is safe here for the usual reason and only that reason — step env is
+      # per-step, so the model steps above cannot read it.
+      - name: Move the task to Done
+        if: always() && steps.completion.outputs.closed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          PROJECT_OWNER: "@me"
+          PROJECT_NUMBER: "4"
+          STATUS: "Done"
+        run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+
+      # ⚠️ PHASE 2: after a task lands and closes, start the next one. The token is minted from
+      # the brewdocs-claude App — issues:write on this repo and nothing else, valid one hour —
+      # because events created with the workflow's own token start no runs, by design. The
+      # dispatch is a label add: the same @claude button the maintainer presses, so no new entry
+      # path exists. ⚠️ `continue-on-error` + the token-empty gate below keep the cascade DARK
+      # when the secrets are absent — the maintainer's manual gesture still works unchanged.
+      - name: Mint the dispatch token
+        id: dispatch-token
+        if: always() && steps.completion.outputs.closed == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DISPATCH_APP_ID }}
+          private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
+      # ⚠️ Gated on the landing having CLOSED the task: a failed run, an unlandable merge, or
+      # work remaining all leave `closed` false, and the cascade halts right there — the failure
+      # capture and report have already told the maintainer where to look. No retry loops: the
+      # @claude label is the in-flight marker, and re-adding a present label fires nothing.
+      - name: Dispatch the next task
+        if: always() && steps.completion.outputs.closed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.dispatch-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          STORY: ${{ needs.delegate.outputs.story }}
+          HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
+        run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
+
+      # ⚠️ The primary call site. After each landing the hook checks whether that was the LAST
+      # task — every earlier landing just reports how many remain. The merge-path call is the net.
+      # Its own already-exists and 0-ahead guards keep re-runs idempotent.
+      # ⚠️ `landed_ref` first: an as-is story has NO `story_branch` output (the delegator blanks
+      # it so the run cuts from the default branch), so the ref the completion hook just landed on
+      # is the only name for it. A task run emits the same ref as `story_branch` carries anyway.
+      - name: Open the story's PR when the last task lands
+        if: always() && steps.roles.outputs.list != '' && (steps.completion.outputs.landed_ref || needs.delegate.outputs.story_branch) != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ steps.completion.outputs.landed_ref || needs.delegate.outputs.story_branch }}
+        run: "$RUNNER_TEMP/agent-bin/open-story-pr.py"
+
+      - name: Label and link the PR
+        if: always() && steps.roles.outputs.list != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # every role that ran, so the PR carries the whole trail rather than whichever
+          # one happened to be last
+          ROLES: ${{ steps.roles.outputs.list }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          # ⚠️ The same author output post-handoff.py gets, and the reason this step can tell a
+          # finished task from a half-done one. Without it the hook only ever asked whether the
+          # closing keyword was present, never why it was absent — so an author that deliberately
+          # left it off had that decision overwritten, and #617 closed as completed with its
+          # wiring never written.
+          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output }}
+        run: "$RUNNER_TEMP/agent-bin/finish-pr.py"
+      - name: Persist the author's handoff
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          # ⚠️ The PR half of the same trigger, and it is load-bearing. ISSUE is deliberately
+          # blank on a PR, and the hook used to return on that alone — so a follow-up run, which
+          # is where review feedback arrives, produced a schema-forced handoff and discarded it.
+          # STORY is resolved for a PR too (delegate.py rule 2, off the head branch), so with
+          # this the handoff and its `decisions` reach the story either way.
+          PR: ${{ github.event.issue.pull_request && github.event.issue.number || '' }}
+          # where it is posted: the story's ISSUE, which always exists. The story's PR does
+          # not, until the first task PR merges into its branch.
+          STORY: ${{ needs.delegate.outputs.story }}
+          ROLES: ${{ steps.roles.outputs.list }}
+          # whichever author ran — they are alternatives and emit the same schema, so `||`
+          # takes the one that produced output. Empty when neither ran or the step failed,
+          # which the hook treats as "nothing to post" rather than an error.
+          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output }}
+        run: "$RUNNER_TEMP/agent-bin/post-handoff.py"
+      - name: Update the story's task order
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          STORY: ${{ needs.delegate.outputs.story }}
+        run: "$RUNNER_TEMP/agent-bin/log-to-story.py"
+      - name: Update the epic's work log
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          ROLES: ${{ steps.roles.outputs.list }}
+        run: "$RUNNER_TEMP/agent-bin/log-to-epic.py"
+
+      # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
+      # `always()` so a FAILED run still yields its transcript, which is when you most want one.
+      # ⚠️ Turned on and off at runtime by the AGENT_TRANSCRIPTS repository variable; unset means
+      # off, so this is inert until someone opts in. See .github/actions/capture-transcript.
+      - name: Capture the transcript
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/capture-transcript
+        with:
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'authors') }}
+          role: ${{ needs.delegate.outputs.roles }}
+          execution_file: ${{ steps.implementor.outputs.execution_file || steps.designer.outputs.execution_file || steps.tester.outputs.execution_file || steps.writer.outputs.execution_file }}
+          role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
+          bucket: ${{ secrets.AWS_TRANSCRIPTS_BUCKET }}
+          entity: ${{ github.event.issue.number || github.event.pull_request.number }}
+
+  # ── Security ───────────────────────────────────────────────────────────────────
+  # Reviews what just landed on mainline and files issues for what it finds. Runs on
+  # merge rather than on the PR, deliberately: a review that blocks a merge gets
+  # argued with, a review that files an issue gets triaged.
+  #
+  # ⚠️ It opens issues and nothing else — no code, no PRs, no merges.
+  #
+  # ⚠️ TWO WAYS IN, AND THE MERGE PATH MUST NOT REGRESS. `delegate` skips on `pull_request`
+  # events — it has no arm for them — so without `always()` a job that `needs:` it would
+  # skip on every merge, silently removing the automatic review.
+  security:
+    needs: delegate
+    if: |
+      always() && (
+        (github.event_name == 'pull_request'
+          && github.event.pull_request.merged == true
+          && github.event.pull_request.base.ref == 'mainline')
+        || (needs.delegate.result != 'skipped' && (
+             contains(needs.delegate.outputs.roles, 'security')
+             || contains(github.event.comment.body, '@claude/security')
+             || contains(github.event.review.body, '@claude/security')
+           ))
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # ⚠️ write, not read: the on-demand path's whole contract is that a requested review
+      # always answers, and that answer is `gh pr comment`. GitHub scopes a comment on a PR
+      # under `pull-requests`, not `issues`, so read would fail at the final step and
+      # produce exactly the silence the contract exists to prevent.
+      #
+      # ⚠️ It covers the merge path too, which does not need it — `permissions:` is
+      # job-level and GitHub does not evaluate expressions there, so it cannot be granted
+      # per trigger. Splitting Security into two jobs would buy that granularity at the cost
+      # of duplicating the job; after #492 narrowed the allowlist to specific `gh`
+      # subcommands, what this permission still enables is "post a comment", which is the
+      # feature. Revisit if that allowlist ever widens again.
+      #
+      # Still no `contents: write` — this role reads code and files issues, it never pushes.
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: prompt
+        uses: ./.github/actions/load-prompt
+        with:
+          role: security
+      - id: security
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # the one value a prompt file can't carry: `${{ }}` is evaluated by Actions in
+          # the workflow, never inside a file. Passed as env so security.md stays static
+          # and the model's own shell expands it.
+          # ⚠️ Both paths. `pull_request.number` is empty for a comment ON a PR, where the
+          # number lives at `issue.number` — without the fallback an on-demand review would
+          # run `gh pr diff ""` and review nothing.
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          # merge = automatic, request = someone asked. security.md stays silent on a clean
+          # merge review and always answers a requested one.
+          TRIGGER: ${{ github.event_name == 'pull_request' && 'merge' || 'request' }}
+        with:
+          # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
+          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # Our delegate guard admits this App on purpose — that is how a story cascades — but
+          # admitting it there only gets the job started; the action then refuses at setup, before
+          # the model is called. Measured on run 31929531465 (#1094).
+          # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
+          # it with a prompt it controls. One private App with issues:write is the whole grant.
+          allowed_bots: brewdocs-claude
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # ⚠️ The exact handle, for the reason in #488: with no value this defaults to
+          # "@claude", and "@claude/security review this" would extract as
+          # "/security review this" — swallowed as an unknown slash command, so the run
+          # returns success having never called the model.
+          trigger_phrase: "@claude/security"
+          prompt: ${{ steps.prompt.outputs.body }}
+          # ⚠️ SUBCOMMANDS, NOT FAMILIES — the one role where this matters (#492). It reads
+          # unmerged, unreviewed diffs, so its input is written by whoever authored the
+          # change it is judging. `Bash(gh:*)` plus `pull-requests: write` would have let a
+          # successful prompt injection run `gh pr review --approve` or `gh pr edit` on the
+          # very PR the maintainer asked it to distrust.
+          #
+          # ⚠️ EVERY ENTRY HAS NO MUTATING FORM. That is the rule this list is built on, and
+          # why `git branch` and `git remote` are absent despite being useful for
+          # orientation. Deliberately denied, and the whole point of #492: `gh pr review`,
+          # `gh pr edit`, `gh pr merge`, `gh pr close`, `gh issue close`, `gh issue edit`,
+          # and `gh api` — which reaches every endpoint the token has and would undo the
+          # rest of this list on its own.
+          #
+          # ⚠️ TOO NARROW STARVES IT, and that failure is invisible (#494). Cut to only the
+          # playbook's own commands, the first run spent 5 of 6 turns denied and reported
+          # nothing — and on the merge path a clean review is silent, so "found nothing" and
+          # "could do nothing" look identical from outside. The read-only orientation
+          # commands a review opens with are as load-bearing as the ones that do the work.
+          # ⚠️ It cannot go lower than the action's base set: `Bash(git add|commit|rm:*)`
+          # and `git-push.sh` union in and cannot be removed. `contents: read` is what
+          # actually stops a push, not the allowlist.
+          claude_args: |
+            --model sonnet
+            --allowedTools "Read,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh issue create:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh repo view:*),Bash(gh project item-add:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git status:*),Bash(git rev-parse:*),Bash(git ls-files:*),Bash(git blame:*),Bash(npm audit:*)"
+            --max-turns 40
+
+      # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
+      # `always()` so a FAILED run still yields its transcript, which is when you most want one.
+      # ⚠️ Turned on and off at runtime by the AGENT_TRANSCRIPTS repository variable; unset means
+      # off, so this is inert until someone opts in. See .github/actions/capture-transcript.
+      - name: Capture the transcript
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/capture-transcript
+        with:
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'security') }}
+          role: security
+          execution_file: ${{ steps.security.outputs.execution_file }}
+          role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
+          bucket: ${{ secrets.AWS_TRANSCRIPTS_BUCKET }}
+          entity: ${{ github.event.issue.number || github.event.pull_request.number }}
+
+  # ── Custodial: the back half of the sandwich ─────────────────────────────────
+  # Scripted checks on what the run left behind. The front half (delegate) routes and consults the
+  # root role only where the script cannot decide; this mirrors it.
+  #
+  # ⚠️ NO MODEL STEP, deliberately. Nothing here needs judgement yet, and wiring a model that
+  # decides nothing is a channel with no reader — the failure this repo keeps repeating. It joins
+  # when a check genuinely cannot be scripted.
+  #
+  # ⚠️ `always()` IS LOAD-BEARING AND IS THE #430 TRAP. This needs five role jobs, four of which
+  # skip on any given run, and a job needing a SKIPPED job reports cancelled without it. The same
+  # shape already works for `security`, which carries `always()` because `delegate` skips on
+  # `pull_request` — proven here, not theoretical.
+  custodial:
+    needs: [delegate, architect, researcher, authors, security, claude]
+    if: always() && needs.delegate.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      # ⚠️ WRITE so this phase can CREATE a story branch — the only branch creation on the shaped
+      # path. Safe here on the same argument as everything else in this job: it has no model step,
+      # so nothing untrusted executes in it. Nothing here deletes.
+      contents: write
+      # write, to apply the classification label an issue is missing
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      # ⚠️ FAILS THE RUN when an Architect left no Branch line. That stall reports success today —
+      # measured on #834 and #866 — and `branch-navigation.py` already says the right thing about
+      # it as a warning nobody reads. This is the same sentence with teeth.
+      - name: Check the role left its deliverable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          MODE: deliverable
+          ROLE: ${{ needs.delegate.outputs.roles }}
+          KIND: ${{ needs.delegate.outputs.kind }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: "$RUNNER_TEMP/agent-bin/custodial-sweep.py"
+      # ⚠️ THE TASKS ARE WHY THIS IS HERE. the trigger-time kind pass labels the TRIGGERING issue, so a
+      # story gets one and the tasks the Architect just created never do — and tasks are the most
+      # numerous kind. This runs after `file-sub-issues.py`, the first point at which those
+      # children are discoverable at all. It only ever adds; an existing kind is left alone.
+      - name: Make sure every issue says what it is
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          MODE: kind
+          INCLUDE_SUB_ISSUES: "true"
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+        run: "$RUNNER_TEMP/agent-bin/labels-and-status.py"
+
+  # ── Merge housekeeping ─────────────────────────────────────────────────────────
+  # Closes the issues a merged PR finished and files them on the board.
+  #
+  # ⚠️ NO MODEL. "Parse the closing keyword, close the issue, set one field" is fully
+  # determined, and this is the only backlog behaviour that has worked from its first
+  # run — everything model-driven took three attempts. It is also why PROJECTS_TOKEN
+  # lives here and nowhere a prompt can reach it.
+  merge_housekeeping:
+    # ⚠️ EVERY merged PR, not just an agent's. This gated on a @claude/* label or a Bot
+    # author, and skipped on #485 — the maintainer's own PR, unlabeled per convention —
+    # so eight issues closed via GitHub's native keywords while the board was never
+    # updated and the sub-issue expansion never ran. Nothing here needs the PR to be an
+    # agent's: the board move, the non-default-base fallback and the sub-issue expansion
+    # are all just as right for a hand-written PR, and it exits early on one that closes
+    # no issue.
+    if: |
+      github.event_name == 'pull_request'
+      && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # ⚠️ WRITE, because `open-story-pr.py` calls `gh pr create`. It was `read`, so that call
+      # 403'd every time — the hook has **never once** succeeded, and every story PR in this repo
+      # was opened by hand. The docs described it as the mechanism regardless, which is how a
+      # story branch sat unmerged long enough to lose its work (#735/#815).
+      # ⚠️ Nothing else in this job needs it: `close-merged-work.py` only *reads* PRs and closes
+      # issues, and the board writes go through PROJECTS_TOKEN on their own step.
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stash the agent hooks
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      - name: Close and file the PR's issues
+        env:
+          # Two tokens on purpose. GITHUB_TOKEN reads the PR and closes issues;
+          # PROJECTS_TOKEN is a classic PAT that exists only because it can reach
+          # user-owned Projects v2, and needs `project` + `read:org` and nothing else.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          PROJECT_OWNER: "@me"
+          PROJECT_NUMBER: "4"
+        run: "$RUNNER_TEMP/agent-bin/close-merged-work.py"
+      # ⚠️ The story's PR opens HERE, not in an authoring run. Under sub-branching the story
+      # branch is empty until a task PR merges into it, and GitHub will not open a PR with no
+      # commits between base and head — so the first task merge is the earliest moment it can
+      # exist. Runs for every merged PR and no-ops unless the base is a story branch.
+      # ⚠️ Ordered AFTER close-merged-work.py: it reads task state, and the task this PR
+      # just closed is only closed once that hook has run.
+      - name: Update the story's task order
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # a task PR's base is its story's branch, named <story#>-<summary>
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          STORY=$(printf '%s' "$BASE" | grep -oE '^[0-9]+' || true)
+          export STORY
+          "$RUNNER_TEMP/agent-bin/log-to-story.py"
+      - name: Open the story PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: "$RUNNER_TEMP/agent-bin/open-story-pr.py"
+

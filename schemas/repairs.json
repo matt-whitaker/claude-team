@@ -1,0 +1,63 @@
+{
+  "type": "object",
+  "description": "What the root role returns from a run: the process repairs it wants applied, and what it found but will not touch. ⚠️ THIS IS NOT THE ANSWER TO THE PERSON. The answer goes in the tracking comment, written while the run works; this is the machine-readable tail a hook acts on. A run that puts its answer here and nothing in the comment has answered nobody.",
+  "properties": {
+    "repairs": {
+      "type": "array",
+      "description": "Process state to put right. ⚠️ EMPTY IS THE COMMON CASE and a real answer - most questions need no repair, and inventing one to look useful is worse than none. Every entry is applied by a scripted hook from a fixed repertoire, so a repair that is not expressible here is not a repair you can make: report it instead.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["board-item", "sub-issue-link", "classification-label"],
+            "description": "board-item: put an issue or PR on the project board. sub-issue-link: parent a child to the issue that owns it. classification-label: apply the epic/spike/bug/story label that says what an issue IS - never a routing label, which is the maintainer decision. ⚠️ Three kinds is the whole repertoire, on purpose: anything else, including a missing branch, goes in `unrepairable` where a human acts on it."
+          },
+          "target": {
+            "type": "string",
+            "description": "The issue or PR number this concerns, digits only. For sub-issue-link it is the CHILD."
+          },
+          "parent": {
+            "type": "string",
+            "description": "For sub-issue-link only: the parent issue number, digits only. Ignored for every other kind."
+          },
+          "label": {
+            "type": "string",
+            "description": "For classification-label only: one of epic, spike, bug, story. ⚠️ The hook rejects anything else, so a routing label cannot be applied through here even if asked for."
+          },
+          "wrong": {
+            "type": "string",
+            "description": "What is actually wrong, stated so a reader can check it rather than take it on trust. Name what you looked at."
+          },
+          "why": {
+            "type": "string",
+            "description": "Why it happened, where you can tell. ⚠️ This is the half that makes a repair worth more than a fix: the record exists so the underlying cause gets fixed, not so the symptom keeps getting swept up."
+          }
+        },
+        "required": ["kind", "target", "wrong", "why"],
+        "additionalProperties": false
+      }
+    },
+    "unrepairable": {
+      "type": "array",
+      "description": "Process problems you found and deliberately did not fix - because no repair kind covers them, because fixing would need content changed, or because the right fix is upstream in a rule rather than in this instance. ⚠️ Keeping this separate from `repairs` is the point: a custodian that quietly fixed everything would erase the evidence that the rule is wrong.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "what": {
+            "type": "string",
+            "description": "The problem, stated concretely and with what you read to find it."
+          },
+          "wouldFix": {
+            "type": "string",
+            "description": "What would actually fix it - usually a change to a hook, a permission or a prompt, named precisely enough to act on."
+          }
+        },
+        "required": ["what", "wouldFix"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["repairs", "unrepairable"],
+  "additionalProperties": false
+}

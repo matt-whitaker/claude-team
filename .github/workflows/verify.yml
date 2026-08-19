@@ -1,0 +1,45 @@
+name: Verify
+run-name: "Verify"
+
+on:
+  pull_request:
+  push:
+    branches: [mainline]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m compileall -q hooks
+      - run: python3 -m unittest discover -s tests -v
+      # ⚠️ A `#` line inside an `if: |` block is EXPRESSION TEXT, not a comment, and it invalidates
+      # the whole workflow file — yaml parsers cannot see it. Learned the 35-minute way.
+      - name: No comment lines inside if blocks
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          bad = []
+          for f in pathlib.Path(".github/workflows").glob("*.yml"):
+              lines = f.read_text().split("\n")
+              for i, line in enumerate(lines):
+                  m = re.match(r"^(\s*)if:\s*[|>]", line)
+                  if not m:
+                      continue
+                  indent = len(m.group(1))
+                  for j in range(i + 1, len(lines)):
+                      nxt = lines[j]
+                      if nxt.strip() and (len(nxt) - len(nxt.lstrip())) <= indent:
+                          break
+                      if nxt.strip().startswith("#"):
+                          bad.append(f"{f}:{j+1}")
+          if bad:
+              print("comment inside if: block:", *bad, sep="\n  ")
+              sys.exit(1)
+          print("clean")
+          PY

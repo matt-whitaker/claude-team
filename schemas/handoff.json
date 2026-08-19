@@ -1,0 +1,102 @@
+{
+  "type": "object",
+  "description": "What an authoring role passes to the roles that run after it, and to whoever picks the work up next. Every key is required. An empty array is a real answer meaning nothing here is worth another role a turn, and is not the same as the step never having run at all.",
+  "properties": {
+    "remaining": {
+      "type": "array",
+      "description": "What this task still needs, and therefore is NOT finished. Empty means finished - the task closes on merge exactly as before. Non-empty means it does not: the closing keyword is withheld, the task stays open, and this list is what the next run is told. This is the only way to say half-done. Omitting the keyword from the PR body does not work and never did, because a hook adds it back; that is how a task whose wiring was never written closed as completed and the next role ran against a feature that did not exist. Do not use it to note follow-up work that belongs in its own issue - this is for the task in front of you being incomplete.",
+      "items": {
+        "type": "string",
+        "description": "One thing still to do, stated so someone who was not on this run can pick it up - what is missing, not what went wrong."
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Decisions reached DURING this run that the issue does not already state - above all one the maintainer made in review. This is the field that stops the next agent rebuilding what was just rejected: a review comment is not a durable artifact, the issue and the code are, and an agent reading a plan that still describes the rejected approach will faithfully rebuild it. Empty when the run only did what the issue already said.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "description": "The rule now in force, stated as the rule rather than as a description of the conversation. Someone applying it should not need the thread it came from."
+          },
+          "why": {
+            "type": "string",
+            "description": "What makes it true - the property of the domain or the code that decided it. Reasoning travels; an outcome on its own gets re-litigated or reverted."
+          },
+          "supersedes": {
+            "type": "string",
+            "description": "What this replaces and where that still reads the old way - the acceptance criteria on an issue, a spec id, a function that now contradicts it. Omit only when this is new ground rather than a correction."
+          }
+        },
+        "required": [
+          "decision",
+          "why"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "testingNotes": {
+      "type": "array",
+      "description": "For the Tester. Behaviour that a test written to distrust this change should cover \u2014 not a description of what was built. Empty when the change genuinely warrants no new coverage.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string",
+            "description": "The behaviour or flow to cover, named in reader-facing terms rather than as a file path."
+          },
+          "why": {
+            "type": "string",
+            "description": "What could break here and stay invisible to lint, typecheck and build. A note with no plausible silent failure behind it is not worth a test."
+          }
+        },
+        "required": [
+          "area",
+          "why"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "docsCandidates": {
+      "type": "array",
+      "description": "For the Writer. Things that cost you time to work out and would cost the next reader the same. A proposal, never an instruction \u2014 the Writer decides what earns a place. Empty when nothing cost you time.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Repo-relative path of the document that should carry it. A free string on purpose: these roles are portable and must not encode the layout of any one repository."
+          },
+          "note": {
+            "type": "string",
+            "description": "What the document should say, stated as the fact itself rather than as a topic to write about."
+          },
+          "why": {
+            "type": "string",
+            "description": "The concrete cost you paid for not knowing it. This is the field that decides whether the note survives; with no real cost behind it, it usually should not."
+          }
+        },
+        "required": [
+          "file",
+          "note",
+          "why"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commitMessage": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "The commit message for the changes this run made - imperative subject, one line, optionally a short body after a blank line. A scripted hook makes the commit; never run git commit yourself. Left empty, the hook writes a deterministic fallback from the task title."
+    }
+  },
+  "required": [
+    "remaining",
+    "decisions",
+    "testingNotes",
+    "docsCandidates",
+    "commitMessage"
+  ],
+  "additionalProperties": false
+}
