@@ -63,9 +63,13 @@ deterministic next time.
 
 ## Consuming it
 
-Per role, a workflow needs to compose the prompt from this package plus your overlay, run the
-hooks around the model step, and pass the role its issue and story numbers as environment
-variables.
+The consumer contract is a ~60-line stub calling the reusable workflow
+([`templates/consumer-stub.yml`](templates/consumer-stub.yml), pinned to a `vN` tag) plus a
+`.claude-team/` directory holding your prompt overlays. [`ONBOARDING.md`](ONBOARDING.md) is the
+runbook — point a Claude session at it together with a target repo and it walks the whole
+install: inputs, stub, overlays, labels, the maintainer's secrets, and the drill that proves it.
+[`claude-team-example`](https://github.com/matt-whitaker/claude-team-example) is a living,
+annotated install.
 
 Nothing in this package names a consuming repo, its branches, its gate or its packages — anything
 that does belongs in your overlay.
