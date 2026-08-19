@@ -35,6 +35,16 @@ concurrency:
 
 jobs:
   team:
+    # ⚠️ THE CEILING, NOT THE GRANT. A called workflow's jobs cannot request permissions the caller
+    # did not allow — omit this block and every run dies at startup with "the nested job X is
+    # requesting … but is only allowed …". Each nested job still narrows to its own block; this is
+    # the union of what any of them asks for.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+      id-token: write
     uses: matt-whitaker/claude-team/.github/workflows/team.yml@mainline
     with:
       project_owner: CHANGE-ME
