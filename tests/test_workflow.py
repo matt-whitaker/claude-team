@@ -33,6 +33,12 @@ class TeamWorkflow(unittest.TestCase):
         self.assertIn(".claude-team/setup.sh", TEAM)
         self.assertIn(".claude-team/prompts", ACTION)
 
+    def test_only_the_delegate_checkout_drops_credentials(self):
+        lines = TEAM.splitlines()
+        settings = [i for i, l in enumerate(lines) if l.strip() == "persist-credentials: false"]
+        self.assertEqual(len(settings), 1)
+        self.assertLess(settings[0], lines.index("  architect:"))
+
     def test_no_comment_line_inside_if_blocks(self):
         lines = TEAM.split("\n")
         for i, line in enumerate(lines):
