@@ -1526,6 +1526,7 @@ jobs:
             --model sonnet
             --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*)"
             --max-turns 80
+            --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Writer ──
       # The tech writer. Owns documentation: every CLAUDE.md, the agent instruction files
@@ -1604,6 +1605,7 @@ jobs:
             --model sonnet
             --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
             --max-turns 80
+            --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Once, for the job ──
       # ⚠️ BEFORE finish-pr.py, and the order is load-bearing: the story's PR must not be opened

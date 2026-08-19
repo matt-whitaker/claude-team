@@ -33,6 +33,9 @@ class TeamWorkflow(unittest.TestCase):
         self.assertIn(".claude-team/setup.sh", TEAM)
         self.assertIn(".claude-team/prompts", ACTION)
 
+    def test_every_author_step_carries_the_handoff_schema(self):
+        self.assertEqual(TEAM.count("--json-schema '${{ steps.schema.outputs.body }}'"), 4)
+
     def test_handoff_reads_every_author_step(self):
         handoffs = [l for l in TEAM.splitlines() if "HANDOFF:" in l and "steps." in l]
         self.assertEqual(len(handoffs), 3)
