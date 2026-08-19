@@ -1631,7 +1631,7 @@ jobs:
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
           # `remaining` decides whether the task closes — the author's only structured way to say
           # it did not finish. `commitMessage` names the commit the hook makes.
-          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output }}
+          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output || steps.tester.outputs.structured_output || steps.writer.outputs.structured_output }}
         run: "$RUNNER_TEMP/agent-bin/work-completion.py"
 
       # ⚠️ THE OTHER EXIT. A failed model step or a conflicted landing pushes the run's changes to
@@ -1723,7 +1723,7 @@ jobs:
           # closing keyword was present, never why it was absent — so an author that deliberately
           # left it off had that decision overwritten, and #617 closed as completed with its
           # wiring never written.
-          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output }}
+          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output || steps.tester.outputs.structured_output || steps.writer.outputs.structured_output }}
         run: "$RUNNER_TEMP/agent-bin/finish-pr.py"
       - name: Persist the author's handoff
         if: always()
@@ -1744,7 +1744,7 @@ jobs:
           # whichever author ran — they are alternatives and emit the same schema, so `||`
           # takes the one that produced output. Empty when neither ran or the step failed,
           # which the hook treats as "nothing to post" rather than an error.
-          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output }}
+          HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output || steps.tester.outputs.structured_output || steps.writer.outputs.structured_output }}
         run: "$RUNNER_TEMP/agent-bin/post-handoff.py"
       - name: Update the story's task order
         if: always()
