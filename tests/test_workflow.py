@@ -3,6 +3,7 @@ import unittest
 
 TEAM = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/team.yml").read_text()
 ACTION = (pathlib.Path(__file__).resolve().parent.parent / ".github/actions/load-prompt/action.yml").read_text()
+STUB = (pathlib.Path(__file__).resolve().parent.parent / "templates/consumer-stub.yml").read_text()
 
 
 class TeamWorkflow(unittest.TestCase):
@@ -49,3 +50,26 @@ class TeamWorkflow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReleasePins(unittest.TestCase):
+    """Every pin that must move together at release time, asserted equal on every push.
+
+    The pins: TEAM_REF (what the jobs clone), the remote refs on the two composite actions
+    inside team.yml, load-prompt's default ref, and the stub template's @ref. A release that
+    moves one without the rest ships a workflow fetching assets from a different version of
+    itself — the drift this suite exists to make impossible."""
+
+    def refs(self):
+        import re
+        team_ref = re.search(r"TEAM_REF: (\S+)", TEAM).group(1)
+        action_refs = set(re.findall(r"uses: matt-whitaker/claude-team/[^@\n]+@(\S+)", TEAM))
+        prompt_default = re.search(r"ref:\n    description[^\n]*\n    required: false\n    default: (\S+)", ACTION).group(1)
+        stub_ref = re.search(r"uses: matt-whitaker/claude-team/\.github/workflows/team\.yml@(\S+)", STUB).group(1)
+        return team_ref, action_refs, prompt_default, stub_ref
+
+    def test_all_pins_agree(self):
+        team_ref, action_refs, prompt_default, stub_ref = self.refs()
+        self.assertEqual(action_refs, {team_ref})
+        self.assertEqual(prompt_default, team_ref)
+        self.assertEqual(stub_ref, team_ref)
