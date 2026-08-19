@@ -1,5 +1,7 @@
 # claude-team
 
+> **See it live:** [claude-team-example](https://github.com/matt-whitaker/claude-team-example) — the smallest real integration, and this repo's own drill target. Its Actions tab shows the machinery running (and stopping, by design, at the missing-credentials boundary).
+
 A portable definition of a Claude/GitHub role team — the prompts each role runs on, and the
 scripted hooks that do the bookkeeping around them. A repo **consumes** it by pointing a
 workflow at these files, and **extends** it with its own per-role overlay.
