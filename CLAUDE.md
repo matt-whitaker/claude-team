@@ -11,16 +11,20 @@ which once silently shadowed a stub), imports the pure text helpers from the *re
 they cannot drift, and runs every git-touching case against real repositories — including
 deliberately stale refs, the condition sandboxes kept lacking.
 
-⚠️ **Phase 1 state**: content moved verbatim; `team.yml` is still the push-consumed workflow and
-still names its origin repo in places. Phase 2 (`claude-code#36`) parameterizes it behind
-`workflow_call`. Do not wire a consumer against this yet.
+⚠️ **Phase 2 state**: `team.yml` is a reusable workflow (`on: workflow_call`). A consumer holds
+the frozen stub (`templates/consumer-stub.yml`) plus a `.claude-team/` directory — `prompts/`
+overlays (`_shared.md` required) and an optional executable `setup.sh`. Inputs: `project_owner`,
+`project_number`, `allowed_bots`, `node`, `browser`. ⚠️ **Two pins move together**: the consumer's
+`@ref` on the workflow, and `TEAM_REF` inside it (what the jobs fetch at run time) — release
+tooling owns keeping them equal. No production consumer is converted yet (brewdocs.beer is
+Phase 3).
 
 **Purpose.** A portable Claude/GitHub role team: the prompts each role runs on, the scripted
 hooks around them, and the handoff contract between them. Consumed by pointing a workflow at
 these files; extended by a per-role overlay in the consuming repo.
 **Where.** `prompts/_shared.md` + `prompts/<role>.md`, `hooks/*.py`, `schemas/handoff.json`.
 **Invariants.** Nothing here names a consuming repo, its branches, its gate or its packages.
-Routing is a script, never a model. Every hook is deterministic and derives its input from
+Routing is a script first: state decides wherever state can, and a model is consulted only where it cannot — a bare mention that could be a question or a request, a stamp that is missing — with the script's own answer as the floor when the consultation fails. Every hook is deterministic and derives its input from
 state, not from something a model was asked to leave behind.
 
 ## The issue hierarchy

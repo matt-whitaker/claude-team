@@ -1,0 +1,45 @@
+# The whole consumer-side integration: this file, frozen, plus a .claude-team/ directory.
+# Triggers, run-name and concurrency live HERE — a called workflow's own run-name is ignored
+# and its workflow-level concurrency is unsupported.
+name: Claude
+
+run-name: >-
+  Claude ·
+  ${{ github.event_name == 'pull_request'
+  && (github.event.pull_request.merged && 'Post-merge' || 'PR closed')
+  || contains(github.event.comment.body || github.event.review.body, '@claude/architect') && 'Architect'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/implementor') && 'Implementor'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/tester') && 'Tester'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/writer') && 'Writer'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/designer') && 'Designer'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/security') && 'Security'
+  || 'Delegate' }}
+  · #${{ github.event.issue.number || github.event.pull_request.number }}
+  ${{ github.event.issue.title || github.event.pull_request.title }}
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  team:
+    uses: matt-whitaker/claude-team/.github/workflows/team.yml@mainline
+    with:
+      project_owner: CHANGE-ME
+      project_number: "0"
+      allowed_bots: ""
+      node: false
+      browser: false
+    secrets: inherit

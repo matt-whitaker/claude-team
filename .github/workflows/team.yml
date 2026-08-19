@@ -1,25 +1,4 @@
 name: Claude
-# ⚠️ A ternary chain because `run-name` has no variables and no `needs` context — this
-# shape is the only one available. `>-` folds the newlines to spaces, and YAML parses
-# before expressions evaluate, so it is one line by the time it runs. There is no
-# substring function in GitHub expressions, so a long title cannot be truncated here.
-#
-# ⚠️ EVERY CONTINUATION LINE SITS AT THE SAME INDENT as `Claude ·`. A folded scalar keeps
-# a *more*-indented line literal, newline and all — indenting the `||` arms to line them
-# up reads better and silently leaves real newlines inside the expression.
-run-name: >-
-  Claude ·
-  ${{ github.event_name == 'pull_request'
-  && (github.event.pull_request.merged && 'Post-merge' || 'PR closed')
-  || contains(github.event.comment.body || github.event.review.body, '@claude/architect') && 'Architect'
-  || contains(github.event.comment.body || github.event.review.body, '@claude/implementor') && 'Implementor'
-  || contains(github.event.comment.body || github.event.review.body, '@claude/tester') && 'Tester'
-  || contains(github.event.comment.body || github.event.review.body, '@claude/writer') && 'Writer'
-  || contains(github.event.comment.body || github.event.review.body, '@claude/designer') && 'Designer'
-  || contains(github.event.comment.body || github.event.review.body, '@claude/security') && 'Security'
-  || 'Delegate' }}
-  · #${{ github.event.issue.number || github.event.pull_request.number }}
-  ${{ github.event.issue.title || github.event.pull_request.title }}
 
 # ONE WORKFLOW, EIGHT JOBS, EIGHT ROLES. Kept in one file so the Actions history stays
 # readable: one run per trigger, with whatever was not selected skipping inside it rather
@@ -79,7 +58,7 @@ run-name: >-
 # what you want after editing the issue. Concurrency queues it behind any run in flight.
 #
 # ⚠️ BACKLOG WORK IS SCRIPTED, NOT PROMPTED. Every role carries hard-coded hooks around
-# its model step, from `packages/claude-team/hooks/`:
+# its model step, from this repo's `hooks/`, fetched at $TEAM_REF:
 #
 #   delegate job          acknowledge.py           reacts 👀 so the trigger is visibly received
 #   delegate job          delegate.py              picks the role from issue state
@@ -130,30 +109,39 @@ run-name: >-
 # and secret masking covers logs only — not an API payload a model could write — so it
 # stays out of any environment a prompt can read. Step env is per-step, which is what makes
 # these two safe: the model step in the same job cannot see it.
+# ⚠️ TRIGGERS, run-name AND concurrency LIVE IN THE CONSUMER'S STUB — a reusable workflow's own
+# run-name is ignored and its workflow-level concurrency is unsupported; see templates/.
 on:
-  # the primary trigger. Gated to the label being exactly "@claude" — see the loop guard.
-  issues:
-    types: [labeled]
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
-  # review submissions (approve / request-changes) carry their text in
-  # github.event.review.body, not github.event.comment.body
-  pull_request_review:
-    types: [submitted]
-  # merge housekeeping only — no model runs on this event
-  pull_request:
-    types: [closed]
-
-# one Claude run at a time per issue/PR, across all roles. Queue rather than cancel:
-# killing a run midway can leave a half-pushed branch and no PR.
-concurrency:
-  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
-  cancel-in-progress: false
+  workflow_call:
+    inputs:
+      project_owner:
+        description: GitHub Projects owner for the board
+        type: string
+        required: true
+      project_number:
+        description: Projects v2 board number
+        type: string
+        required: true
+      allowed_bots:
+        description: Comma-separated bot logins admitted at the model steps (the dispatch App). Empty admits none.
+        type: string
+        default: ""
+      node:
+        description: Set up Node with npm cache and run npm ci before author runs
+        type: boolean
+        default: false
+      browser:
+        description: Install and cache the Playwright chromium before author runs
+        type: boolean
+        default: false
 
 env:
   NODE_VERSION: 22
+  # ⚠️ THE SECOND PIN. The consumer pins the workflow (`uses: …team.yml@vN`); this pins the assets
+  # the workflow fetches at run time. Release tooling must move both together — a drift check is
+  # part of the release job, not optional.
+  TEAM_REPO: matt-whitaker/claude-team
+  TEAM_REF: mainline
 
 jobs:
   # ── Delegate ───────────────────────────────────────────────────────────────────
@@ -166,7 +154,7 @@ jobs:
   # almost none of it needs judgement. See the header for the loop guard and the `needs:`
   # note, and delegate.py for the precedence rules.
   delegate:
-    # ⚠️ `brewdocs-claude[bot]` — the Phase-2 dispatch App — is INTENDED to pass this guard:
+    # ⚠️ the dispatch App's bot (`inputs.allowed_bots`) is INTENDED to pass this guard:
     # its label-adds are how a story cascades. The two exclusions below stay the loop guard,
     # because every event a role run creates is authored by one of them.
     # ⚠️ THESE LINES MUST STAY OUTSIDE THE `if: |` BLOCK. A literal block scalar has no
@@ -217,8 +205,11 @@ jobs:
           persist-credentials: false
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       # First real step of every run: the 👀 lands before anything has thought about it.
       - name: Acknowledge the trigger
@@ -267,7 +258,7 @@ jobs:
         run: |
           # same constraints as the handoff and findings schemas: one line, and no single quote,
           # because it is inlined into a single-quoted claude_args flag
-          body=$(jq -c . packages/claude-team/schemas/route.json)
+          body=$(jq -c . "$RUNNER_TEMP/team-src/schemas/route.json")
           case "$body" in
             *"'"*) echo "::error::route.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
           esac
@@ -275,7 +266,7 @@ jobs:
           echo "routing schema loaded (${#body} chars)"
       - id: route-prompt
         if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: route
       - id: custodian
@@ -295,13 +286,13 @@ jobs:
           ROUTE_REASON: ${{ steps.route.outputs.reason }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ Required, not optional — the same pairing #668 established. It short-circuits
           # `setupGitHubToken` before OIDC, which is why this job needs no `id-token`; and it is
@@ -474,7 +465,7 @@ jobs:
       - name: Capture the routing transcript
         if: always()
         continue-on-error: true
-        uses: ./.github/actions/capture-transcript
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'route') }}
           role: route
@@ -511,13 +502,16 @@ jobs:
         with:
           fetch-depth: 0
       - id: prompt
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: architect
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       - uses: actions/setup-node@v4
         with:
@@ -541,13 +535,13 @@ jobs:
           KIND: ${{ needs.delegate.outputs.kind }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
           # anything for us — checkContainsTrigger() returns early on `if (prompt) return
@@ -669,8 +663,8 @@ jobs:
           PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           REPO: ${{ github.repository }}
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
-          PROJECT_OWNER: "@me"
-          PROJECT_NUMBER: "4"
+          PROJECT_OWNER: ${{ inputs.project_owner }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
           STATUS: "Todo"
           # never knock an in-flight story back — a re-shape must not undo In Progress
           ONLY_IF_UNSET: "true"
@@ -685,7 +679,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: ./.github/actions/capture-transcript
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'architect') }}
           role: architect
@@ -736,18 +730,21 @@ jobs:
           persist-credentials: false
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       - id: prompt
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: claude
       - id: repairs-schema
         name: Load the repairs schema
         run: |
           # same constraints as every other inlined schema: one line, and no single quote
-          body=$(jq -c . packages/claude-team/schemas/repairs.json)
+          body=$(jq -c . "$RUNNER_TEMP/team-src/schemas/repairs.json")
           case "$body" in
             *"'"*) echo "::error::repairs.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
           esac
@@ -765,13 +762,13 @@ jobs:
           STORY: ${{ needs.delegate.outputs.story }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ Supplied for the two reasons #668 established: it short-circuits `setupGitHubToken`
           # before OIDC, so this job needs no `id-token`; and it makes the `permissions:` block
@@ -824,8 +821,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           REPO: ${{ github.repository }}
-          PROJECT_OWNER: "@me"
-          PROJECT_NUMBER: "4"
+          PROJECT_OWNER: ${{ inputs.project_owner }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
           REPAIRS: ${{ steps.custodian.outputs.structured_output }}
           # ⚠️ `unrepairable` findings carry no target of their own — only `what` and `wouldFix` —
           # so they are reported on whatever triggered the run. Both are passed because the root
@@ -841,7 +838,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: ./.github/actions/capture-transcript
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'claude') }}
           role: claude
@@ -895,13 +892,16 @@ jobs:
           # env. ⚠️ Do NOT copy this to the authoring jobs — they push, and it would break them.
           persist-credentials: false
       - id: prompt
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: researcher
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       - uses: actions/setup-node@v4
         with:
@@ -913,7 +913,7 @@ jobs:
         run: |
           # same constraints as the handoff schema: one line, and no single quote, because it is
           # inlined into a single-quoted claude_args flag
-          body=$(jq -c . packages/claude-team/schemas/findings.json)
+          body=$(jq -c . "$RUNNER_TEMP/team-src/schemas/findings.json")
           case "$body" in
             *"'"*) echo "::error::findings.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
           esac
@@ -933,13 +933,13 @@ jobs:
           KIND: ${{ needs.delegate.outputs.kind }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ THE ONE ROLE THAT PASSES ITS OWN TOKEN, and it does two jobs at once.
           #
@@ -1035,8 +1035,8 @@ jobs:
           PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           REPO: ${{ github.repository }}
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
-          PROJECT_OWNER: "@me"
-          PROJECT_NUMBER: "4"
+          PROJECT_OWNER: ${{ inputs.project_owner }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
           STATUS: "Todo"
           ONLY_IF_UNSET: "true"
         run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
@@ -1048,7 +1048,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: ./.github/actions/capture-transcript
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'researcher') }}
           role: researcher
@@ -1145,28 +1145,31 @@ jobs:
       # same reason the hooks are stashed. A model step checks out a feature branch, and by
       # the Writer's turn the tree is whatever the Implementor left.
       - id: p_implementor
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: implementor
       - id: p_designer
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: designer
       - id: p_tester
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: tester
       - id: p_writer
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: writer
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
 
-      # The handoff contract lives in packages/claude-team so a second repo gets it
+      # The handoff contract lives in this repo's schemas/ so every consumer gets it
       # unchanged, but `--json-schema` takes INLINE JSON, not a path — so the file is
       # compacted to one line here and injected into claude_args below. Same shape as
       # load-prompt: the file is the source of truth, the workflow only carries it.
@@ -1178,7 +1181,7 @@ jobs:
           # ⚠️ claude_args is line-parsed, so the schema must be ONE line; and it is wrapped
           # in single quotes there, so it must contain none. Fail loudly rather than emit a
           # value that would mangle every flag after it.
-          body=$(jq -c . packages/claude-team/schemas/handoff.json)
+          body=$(jq -c . "$RUNNER_TEMP/team-src/schemas/handoff.json")
           case "$body" in
             *"'"*) echo "::error::handoff.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
           esac
@@ -1212,12 +1215,12 @@ jobs:
       # without it `tsc` resolves to the runner image's global TypeScript (a different
       # major) and fails on config this repo pins as valid. The Writer is in this list too:
       # a backfill spec describes a screen that already exists, so it has to drive the app.
-      - if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+      - if: inputs.node && (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer'))
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+      - if: inputs.node && (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer'))
         timeout-minutes: 10
         run: npm ci
       # Browser install as a workflow step, not a Claude turn. Without it the Tester can
@@ -1237,10 +1240,10 @@ jobs:
       # UI's cancel was ignored (only force-cancel killed them). Healthy runs take ~1-2 minutes;
       # a timeout here fails BEFORE any model runs, so a re-trigger is cheap (#1175).
       - id: pw-version
-        if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        if: inputs.browser && (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer'))
         run: echo "version=$(jq -r '.packages["node_modules/@playwright/test"].version' package-lock.json)" >> "$GITHUB_OUTPUT"
       - id: pw-cache
-        if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        if: inputs.browser && (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer'))
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -1248,9 +1251,21 @@ jobs:
       # ⚠️ SKIPPED ENTIRELY ON A CACHE HIT, apt included — ubuntu-latest ships chromium's OS
       # dependencies, and apt is the half that hung three runs (#1175). Fallback if an image
       # update ever breaks a launch: `npx playwright install-deps chromium` on hit (#1179).
-      - if: (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')) && steps.pw-cache.outputs.cache-hit != 'true'
+      - if: inputs.browser && (contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')) && steps.pw-cache.outputs.cache-hit != 'true'
         timeout-minutes: 10
         run: npx playwright install --with-deps chromium
+      # ⚠️ THE CONSUMER OWNS ITS OWN SETUP. `inputs.node`/`inputs.browser` cover the common cases with
+      # caching an action can provide and a shell script cannot; everything else this repo's
+      # authors need is the consumer's `.claude-team/setup.sh`.
+      - name: Consumer setup
+        if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
+        timeout-minutes: 15
+        run: |
+          if [ -x .claude-team/setup.sh ]; then
+            .claude-team/setup.sh
+          else
+            echo "no .claude-team/setup.sh — no extra author setup"
+          fi
 
       # ⚠️ THE STORY BRANCH MUST EXIST BEFORE ANY MODEL STEP, and until #777 nothing guaranteed
       # it on this path. `setupBranch` resolves the base branch first of all —
@@ -1290,8 +1305,8 @@ jobs:
           PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           REPO: ${{ github.repository }}
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
-          PROJECT_OWNER: "@me"
-          PROJECT_NUMBER: "4"
+          PROJECT_OWNER: ${{ inputs.project_owner }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
           STATUS: "In Progress"
         run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
 
@@ -1320,13 +1335,13 @@ jobs:
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
           # anything for us — checkContainsTrigger() returns early on `if (prompt) return
@@ -1400,13 +1415,13 @@ jobs:
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
           # anything for us — checkContainsTrigger() returns early on `if (prompt) return
@@ -1468,13 +1483,13 @@ jobs:
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
           # anything for us — checkContainsTrigger() returns early on `if (prompt) return
@@ -1540,13 +1555,13 @@ jobs:
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ THE EXACT HANDLE, and this is load-bearing. trigger_phrase does NOT gate
           # anything for us — checkContainsTrigger() returns early on `if (prompt) return
@@ -1648,13 +1663,13 @@ jobs:
           PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           REPO: ${{ github.repository }}
           ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
-          PROJECT_OWNER: "@me"
-          PROJECT_NUMBER: "4"
+          PROJECT_OWNER: ${{ inputs.project_owner }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
           STATUS: "Done"
         run: MODE=status "$RUNNER_TEMP/agent-bin/labels-and-status.py"
 
       # ⚠️ PHASE 2: after a task lands and closes, start the next one. The token is minted from
-      # the brewdocs-claude App — issues:write on this repo and nothing else, valid one hour —
+      # the the dispatch App App — issues:write on this repo and nothing else, valid one hour —
       # because events created with the workflow's own token start no runs, by design. The
       # dispatch is a label add: the same @claude button the maintainer presses, so no new entry
       # path exists. ⚠️ `continue-on-error` + the token-empty gate below keep the cascade DARK
@@ -1754,7 +1769,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: ./.github/actions/capture-transcript
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'authors') }}
           role: ${{ needs.delegate.outputs.roles }}
@@ -1810,7 +1825,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: prompt
-        uses: ./.github/actions/load-prompt
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: security
       - id: security
@@ -1829,13 +1844,13 @@ jobs:
           TRIGGER: ${{ github.event_name == 'pull_request' && 'merge' || 'request' }}
         with:
           # ⚠️ THE HOST ACTION HAS ITS OWN ACTOR GUARD, INDEPENDENT OF OURS, and it rejected every
-          # cascaded run: "Workflow initiated by non-human actor: brewdocs-claude (type: Bot)".
+          # cascaded run: "Workflow initiated by non-human actor: <your-app> (type: Bot)".
           # Our delegate guard admits this App on purpose — that is how a story cascades — but
           # admitting it there only gets the job started; the action then refuses at setup, before
           # the model is called. Measured on run 31929531465 (#1094).
           # ⚠️ NAMED, NEVER `*`. The action's own warning is that `*` lets any external App invoke
           # it with a prompt it controls. One private App with issues:write is the whole grant.
-          allowed_bots: brewdocs-claude
+          allowed_bots: ${{ inputs.allowed_bots }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # ⚠️ The exact handle, for the reason in #488: with no value this defaults to
           # "@claude", and "@claude/security review this" would extract as
@@ -1876,7 +1891,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: ./.github/actions/capture-transcript
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'security') }}
           role: security
@@ -1912,8 +1927,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       # ⚠️ FAILS THE RUN when an Architect left no Branch line. That stall reports success today —
       # measured on #834 and #866 — and `branch-navigation.py` already says the right thing about
@@ -1974,8 +1992,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Stash the agent hooks
         run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
           mkdir -p "$RUNNER_TEMP/agent-bin"
-          cp packages/claude-team/hooks/*.py "$RUNNER_TEMP/agent-bin/"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       - name: Close and file the PR's issues
         env:
@@ -1986,8 +2007,8 @@ jobs:
           PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-          PROJECT_OWNER: "@me"
-          PROJECT_NUMBER: "4"
+          PROJECT_OWNER: ${{ inputs.project_owner }}
+          PROJECT_NUMBER: ${{ inputs.project_number }}
         run: "$RUNNER_TEMP/agent-bin/close-merged-work.py"
       # ⚠️ The story's PR opens HERE, not in an authoring run. Under sub-branching the story
       # branch is empty until a task PR merges into it, and GitHub will not open a PR with no

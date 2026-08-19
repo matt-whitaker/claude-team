@@ -3,10 +3,10 @@ description: Assembles a role's prompt from the claude-team base and this repo's
 
 # The prompt is four files, in this order:
 #
-#   packages/claude-team/prompts/_shared.md   the hierarchy and house rules, every role
-#   packages/claude-team/prompts/<role>.md    how this role behaves
-#   .github/agent-prompts/_shared.md          this repo's specifics, every role
-#   .github/agent-prompts/<role>.md           this repo's specifics for this role
+#   <team>/prompts/_shared.md          the hierarchy and house rules, every role
+#   <team>/prompts/<role>.md           how this role behaves
+#   .claude-team/prompts/_shared.md    the consumer's specifics, every role
+#   .claude-team/prompts/<role>.md     the consumer's specifics for this role
 #
 # ⚠️ THAT ORDER IS LOAD-BEARING, and the code drifted from this comment once already.
 # `_shared.md` opens by overriding the action's own tag-mode prompt, which tells the model
@@ -27,6 +27,18 @@ inputs:
   role:
     description: Role name, selecting <role>.md from the base and the overlay
     required: true
+  repo:
+    description: The claude-team repo holding the base prompts
+    required: false
+    default: matt-whitaker/claude-team
+  ref:
+    description: The ref of that repo to fetch
+    required: false
+    default: mainline
+  overlay:
+    description: The consumer's overlay directory
+    required: false
+    default: .claude-team/prompts
 
 outputs:
   body:
@@ -39,8 +51,11 @@ runs:
     - id: read
       shell: bash
       run: |
-        base=packages/claude-team/prompts
-        overlay=.github/agent-prompts
+        if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+          git clone -q --depth 1 --branch "${{ inputs.ref }}" "https://github.com/${{ inputs.repo }}" "$RUNNER_TEMP/team-src"
+        fi
+        base="$RUNNER_TEMP/team-src/prompts"
+        overlay="${{ inputs.overlay }}"
         role="${{ inputs.role }}"
 
         for f in "$base/_shared.md" "$base/$role.md" "$overlay/_shared.md"; do

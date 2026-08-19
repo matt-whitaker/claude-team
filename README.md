@@ -42,7 +42,7 @@ triggers every run.
 
 ## How a run is routed
 
-**Routing is a script, never a model.** It is all readable state, and the one judgement call —
+**Routing is a script first: state decides wherever state can, and a model is consulted only where it cannot — a bare mention that could be a question or a request, a stamp that is missing — with the script's own answer as the floor when the consultation fails.** It is all readable state, and the one judgement call —
 which author owns a task — is answered once by the Architect and written into the task as a
 `Role:` line. Three ways in:
 
