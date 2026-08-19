@@ -34,7 +34,7 @@ inputs:
   ref:
     description: The ref of that repo to fetch
     required: false
-    default: mainline
+    default: v1.1
   overlay:
     description: The consumer's overlay directory
     required: false

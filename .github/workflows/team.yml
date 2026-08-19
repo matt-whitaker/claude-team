@@ -141,7 +141,7 @@ env:
   # the workflow fetches at run time. Release tooling must move both together — a drift check is
   # part of the release job, not optional.
   TEAM_REPO: matt-whitaker/claude-team
-  TEAM_REF: mainline
+  TEAM_REF: v1.1
 
 jobs:
   # ── Delegate ───────────────────────────────────────────────────────────────────
@@ -267,7 +267,7 @@ jobs:
           echo "routing schema loaded (${#body} chars)"
       - id: route-prompt
         if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: route
       - id: custodian
@@ -466,7 +466,7 @@ jobs:
       - name: Capture the routing transcript
         if: always()
         continue-on-error: true
-        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@v1.1
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'route') }}
           role: route
@@ -503,7 +503,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: prompt
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: architect
       - name: Stash the agent hooks
@@ -680,7 +680,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@v1.1
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'architect') }}
           role: architect
@@ -737,7 +737,7 @@ jobs:
           cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
           chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       - id: prompt
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: claude
       - id: repairs-schema
@@ -838,7 +838,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@v1.1
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'claude') }}
           role: claude
@@ -892,7 +892,7 @@ jobs:
           # on the first private consumer (#2). What holds this role's line is "no shell" (#665)
           # and the token's own narrow grant — not this flag.
       - id: prompt
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: researcher
       - name: Stash the agent hooks
@@ -1048,7 +1048,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@v1.1
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'researcher') }}
           role: researcher
@@ -1145,19 +1145,19 @@ jobs:
       # same reason the hooks are stashed. A model step checks out a feature branch, and by
       # the Writer's turn the tree is whatever the Implementor left.
       - id: p_implementor
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: implementor
       - id: p_designer
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: designer
       - id: p_tester
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: tester
       - id: p_writer
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: writer
       - name: Stash the agent hooks
@@ -1769,7 +1769,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@v1.1
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'authors') }}
           role: ${{ needs.delegate.outputs.roles }}
@@ -1825,7 +1825,7 @@ jobs:
         with:
           fetch-depth: 0
       - id: prompt
-        uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
+        uses: matt-whitaker/claude-team/.github/actions/load-prompt@v1.1
         with:
           role: security
       - id: security
@@ -1891,7 +1891,7 @@ jobs:
       - name: Capture the transcript
         if: always()
         continue-on-error: true
-        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
+        uses: matt-whitaker/claude-team/.github/actions/capture-transcript@v1.1
         with:
           enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'security') }}
           role: security
