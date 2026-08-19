@@ -11,6 +11,12 @@ which once silently shadowed a stub), imports the pure text helpers from the *re
 they cannot drift, and runs every git-touching case against real repositories — including
 deliberately stale refs, the condition sandboxes kept lacking.
 
+⚠️ **Releasing**: check out mainline, flip every pin (`TEAM_REF`, the in-workflow `@refs`,
+`load-prompt`'s default, the stub template) from `mainline` to `vN` in one commit, run the suite
+(`ReleasePins` asserts the agreement), tag that commit `vN`, push the tag, and **do not merge the
+release commit** — mainline keeps its canary pins. Consumers pin `@vN`; brewdocs.beer alone tracks
+`@mainline`.
+
 ⚠️ **Phase 2 state**: `team.yml` is a reusable workflow (`on: workflow_call`). A consumer holds
 the frozen stub (`templates/consumer-stub.yml`) plus a `.claude-team/` directory — `prompts/`
 overlays (`_shared.md` required) and an optional executable `setup.sh`. Inputs: `project_owner`,
