@@ -199,9 +199,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # ⚠️ The custodian step below reads issue bodies, which anyone can file. Same reasoning
-          # as the Researcher: `persist-credentials: true` leaves the token in `.git/config` as an
-          # http extraheader, recoverable by anything holding `Read`. Nothing in this job pushes.
+          # ⚠️ The custodian step below reads issue bodies, which anyone can file — keep the
+          # token out of `.git/config`. Safe HERE, uniquely: the route consult runs agent mode,
+          # which configures git auth without ever calling `setupBranch`, so nothing in this job
+          # fetches on checkout's credential. The tag-mode roles must persist theirs (#2).
           persist-credentials: false
       - name: Stash the agent hooks
         run: |
@@ -724,10 +725,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # ⚠️ Same reasoning as the Researcher: `persist-credentials: true` leaves the token in
-          # `.git/config` as an http extraheader, recoverable by anything holding `Read`. This role
-          # never pushes, so there is nothing to lose by dropping it.
-          persist-credentials: false
+          # ⚠️ NO `persist-credentials: false` — it was here, and it broke every private
+          # consumer: this job runs tag mode too, so it fetches before the action configures
+          # git auth. The full finding lives on the Researcher's checkout (#2).
       - name: Stash the agent hooks
         run: |
           if [ ! -d "$RUNNER_TEMP/team-src" ]; then
@@ -880,17 +880,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # ⚠️ THE ONLY CHECKOUT HERE THAT SETS THIS, and it closes a hole the "no shell" rule
-          # does not. `actions/checkout` defaults to `persist-credentials: true`, which leaves the
-          # token in `.git/config` as an `http.<host>.extraheader` — so an agent with nothing but
-          # `Read` can recover a live credential from a FILE, no command execution required, and
-          # then post it anywhere with WebFetch. Removing Bash was necessary and, on its own, not
-          # sufficient (#669).
-          #
-          # Safe to disable here because nothing in this job uses git after checkout: the model
-          # only reads, and the hooks authenticate through `gh` with a token from their own step
-          # env. ⚠️ Do NOT copy this to the authoring jobs — they push, and it would break them.
-          persist-credentials: false
+          # ⚠️ NO `persist-credentials: false` here, though #669 added it to keep the token out
+          # of `.git/config`, where bare `Read` recovers it. Two findings retired it (#2). Its
+          # premise — "nothing in this job uses git after checkout" — was false: tag mode fetches
+          # the source branch BEFORE the action configures its own git auth (`setupBranch`
+          # precedes `configureGitAuth`, src/modes/tag/index.ts), so the fetch has only
+          # checkout's credential, and without one every PRIVATE consumer dies at branch setup —
+          # while a public repo fetches anonymously and never shows it. And the flag never
+          # guarded the model window anyway: `configureGitAuth` re-embeds the job token in the
+          # origin URL in `.git/config` for the whole run, whatever checkout persisted. Measured
+          # on the first private consumer (#2). What holds this role's line is "no shell" (#665)
+          # and the token's own narrow grant — not this flag.
       - id: prompt
         uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
