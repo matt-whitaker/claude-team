@@ -19,7 +19,12 @@ Settle these before touching files; each is a judgment call about the target, no
   upgrade, not a prerequisite — and the value is flipped to the App's slug later, when the App
   half of step 6 happens. ⚠️ Name the App, never `*`: a wildcard admits any App on GitHub.
 - **`node`** — `true` if any author needs a runtime to install or build with; a repo whose gate
-  is `npm run <anything>` wants it even with zero dependencies.
+  is `npm run <anything>` wants it even with zero dependencies. ⚠️ `true` requires a
+  **committed `package-lock.json`**, even with zero dependencies: `actions/setup-node`'s npm
+  cache fails the author job at setup without one — *"Dependencies lock file is not found"*, a
+  message that reads like a caching detail but means the repo lacks a lockfile — and `npm ci`
+  two steps later requires it anyway. A spike passing proves nothing here: the Researcher
+  builds nothing, so the first *author* run is where this surfaces.
 - **`browser`** — `true` only if authors must drive a running app to verify their work. Every
   author run then pays a chromium download, so a data or docs repo says `false`.
 
