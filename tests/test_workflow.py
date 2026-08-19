@@ -33,6 +33,13 @@ class TeamWorkflow(unittest.TestCase):
         self.assertIn(".claude-team/setup.sh", TEAM)
         self.assertIn(".claude-team/prompts", ACTION)
 
+    def test_handoff_reads_every_author_step(self):
+        handoffs = [l for l in TEAM.splitlines() if "HANDOFF:" in l and "steps." in l]
+        self.assertEqual(len(handoffs), 3)
+        for line in handoffs:
+            for step in ("implementor", "designer", "tester", "writer"):
+                self.assertIn(f"steps.{step}.outputs.structured_output", line)
+
     def test_only_the_delegate_checkout_drops_credentials(self):
         lines = TEAM.splitlines()
         settings = [i for i, l in enumerate(lines) if l.strip() == "persist-credentials: false"]
