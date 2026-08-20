@@ -1,0 +1,72 @@
+[
+  {
+    "name": "@claude",
+    "color": "c15f3c",
+    "description": "The front door \u2014 applying it starts a run, and it is spent at close"
+  },
+  {
+    "name": "@claude/architect",
+    "color": "fbca04",
+    "description": "Claude: researches and breaks down stories"
+  },
+  {
+    "name": "@claude/implementor",
+    "color": "1d76db",
+    "description": "Claude: implement an issue"
+  },
+  {
+    "name": "@claude/designer",
+    "color": "1d76db",
+    "description": "Designer \u2014 the design-system author"
+  },
+  {
+    "name": "@claude/tester",
+    "color": "0e8a16",
+    "description": "Claude: add test coverage"
+  },
+  {
+    "name": "@claude/writer",
+    "color": "5319e7",
+    "description": "Claude: update documentation"
+  },
+  {
+    "name": "@claude/researcher",
+    "color": "fbca04",
+    "description": "Claude: answers a spike and recommends, shapes nothing"
+  },
+  {
+    "name": "@claude/security",
+    "color": "b60205",
+    "description": "Claude: secure the project"
+  },
+  {
+    "name": "@claude/complete",
+    "color": "0e8a16",
+    "description": "The agent machinery finished this \u2014 swapped in for @claude at close"
+  },
+  {
+    "name": "epic",
+    "color": "be14e5",
+    "description": "A body of work spanning several stories \u2014 the maintainer's to create, never a role's"
+  },
+  {
+    "name": "spike",
+    "color": "1d76db",
+    "description": "A question the work cannot start without \u2014 answered by the Researcher, ships nothing"
+  },
+  {
+    "name": "bug",
+    "color": "d73a4a",
+    "description": "Something isn't working"
+  },
+  {
+    "name": "story",
+    "color": "0e8a16",
+    "description": "One shippable outcome, carrying its own branch and the PR that closes it"
+  },
+  {
+    "name": "task",
+    "color": "1d76db",
+    "description": "A slice of a story, with its own branch and PR"
+  }
+]
