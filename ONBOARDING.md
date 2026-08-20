@@ -66,11 +66,28 @@ Nothing in the base prompts names any repo — if an overlay only restates the b
 ## 4. The labels
 
 Create them all before the first run — the front door triggers nothing without `@claude`, and a
-missing role label makes the stamp hook warn and skip:
+missing role label makes the stamp hook warn and skip.
 
-`@claude` · `@claude/architect` · `@claude/implementor` · `@claude/designer` ·
-`@claude/tester` · `@claude/writer` · `@claude/researcher` · `@claude/security` ·
-`@claude/complete` · and the classification set `epic` / `spike` / `bug` / `story` / `task`.
+[`templates/labels.json`](templates/labels.json) is the canonical set: fourteen labels with their
+colours and descriptions. Apply it rather than typing them, so a fleet reads the same way at a
+glance — the colour is doing real work on a board, where `@claude/security` in red and
+`@claude/complete` in green are how you find a run's state without opening anything:
+
+```bash
+curl -s https://raw.githubusercontent.com/matt-whitaker/claude-team/mainline/templates/labels.json \
+  | jq -c '.[]' | while read -r l; do
+      name=$(jq -r .name <<<"$l"); color=$(jq -r .color <<<"$l"); desc=$(jq -r .description <<<"$l")
+      gh label create "$name" -R <owner>/<repo> --color "$color" --description "$desc" 2>/dev/null \
+        || gh label edit "$name" -R <owner>/<repo> --color "$color" --description "$desc"
+    done
+```
+
+⚠️ **The `create || edit` pair is deliberate** — it is idempotent, so it both seeds a new consumer
+and re-syncs one whose colours have drifted. brewdocs.beer-kb was onboarded by hand before this
+file existed and ended up with every role the same purple, which is exactly the failure this
+removes.
+
+A repo may add labels of its own; nothing here removes them.
 
 ## 5. Ship it
 

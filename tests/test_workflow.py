@@ -122,3 +122,28 @@ class SelfInstall(unittest.TestCase):
         # so both belong here rather than upstream.
         for key in ("on:", "issues:", "issue_comment:", "pull_request:", "run-name:", "concurrency:"):
             self.assertIn(key, SELF, key)
+
+class CanonicalLabels(unittest.TestCase):
+    """The label set is part of the consumer contract; the doc and the data must agree."""
+
+    def setUp(self):
+        import json
+        root = pathlib.Path(__file__).resolve().parent.parent
+        self.labels = json.load(open(root / "templates/labels.json"))
+        self.onboarding = (root / "ONBOARDING.md").read_text()
+
+    def test_every_label_has_a_colour_and_a_description(self):
+        for l in self.labels:
+            self.assertRegex(l["color"], r"^[0-9a-f]{6}$", l["name"])
+            self.assertTrue(l["description"].strip(), f"{l['name']} has no description")
+
+    def test_the_roles_the_workflow_stamps_all_have_labels(self):
+        named = {l["name"] for l in self.labels}
+        for role in ("architect", "implementor", "designer", "tester", "writer",
+                     "researcher", "security", "complete"):
+            self.assertIn(f"@claude/{role}", named)
+        self.assertIn("@claude", named)
+
+    def test_onboarding_points_at_the_file_rather_than_listing_them(self):
+        self.assertIn("templates/labels.json", self.onboarding)
+
