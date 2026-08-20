@@ -49,3 +49,15 @@ class Scrub(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class RepairSchemaMatchesTheHook(unittest.TestCase):
+    """The schema is what the model reads; the hook is what enforces. They must agree."""
+
+    def test_every_classification_the_hook_accepts_is_offered_by_the_schema(self):
+        import json, pathlib, re
+        root = pathlib.Path(__file__).resolve().parent.parent
+        hook = (root / "hooks/apply-repairs.py").read_text()
+        allowed = set(re.search(r"CLASSIFICATION = \{([^}]*)\}", hook).group(1).replace('"', "").replace(" ", "").split(","))
+        schema = json.dumps(json.load(open(root / "schemas/repairs.json")))
+        missing = [label for label in allowed if label not in schema]
+        self.assertEqual(missing, [], f"the hook accepts {missing} but the schema never mentions them")
