@@ -1,0 +1,72 @@
+# claude-team CONSUMING ITSELF. The stub, frozen, exactly as templates/consumer-stub.yml ships it
+# — the only edits are the five inputs below and this note.
+#
+# ⚠️ THE `@ref` HERE IS PINNED TO `mainline` AND MUST STAY THERE. Every other consumer pins a
+# `vN` tag and bumps it in a one-line PR. This one cannot: release tooling flips the four pins it
+# knows about (TEAM_REF, the two composite-action refs, load-prompt's default, the template's) on a
+# commit that is tagged and DELIBERATELY NOT MERGED, so a `vN` written here would be a fifth pin
+# nothing asserts and nobody remembers — and mainline would run its own team on stale assets.
+# `SelfInstall` in tests/test_workflow.py asserts this file tracks `mainline` for that reason.
+#
+# ⚠️ A RUN HERE EXECUTES THE HOOKS AT `mainline`, NOT THE ONES IN THE CHECKOUT. Editing hooks/ on
+# a branch changes nothing about the run editing them; merging it changes the machinery for this
+# repo, for claude-team-example, and for every consumer tracking mainline at once.
+# The whole consumer-side integration: this file, frozen, plus a .claude-team/ directory.
+# Triggers, run-name and concurrency live HERE — a called workflow's own run-name is ignored
+# and its workflow-level concurrency is unsupported.
+name: Claude
+
+run-name: >-
+  Claude ·
+  ${{ github.event_name == 'pull_request'
+  && (github.event.pull_request.merged && 'Post-merge' || 'PR closed')
+  || contains(github.event.comment.body || github.event.review.body, '@claude/architect') && 'Architect'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/implementor') && 'Implementor'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/tester') && 'Tester'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/writer') && 'Writer'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/designer') && 'Designer'
+  || contains(github.event.comment.body || github.event.review.body, '@claude/security') && 'Security'
+  || github.event_name == 'issues' && github.event.label.name != '@claude' && format('Label {0}', github.event.label.name)
+  || github.event_name == 'issues' && endsWith(github.actor, '[bot]') && 'Cascade'
+  || github.event_name == 'issues' && 'Run'
+  || contains(github.event.comment.body || github.event.review.body, '@claude') && 'Root'
+  || 'Comment' }}
+  · #${{ github.event.issue.number || github.event.pull_request.number }}
+  ${{ github.event.issue.title || github.event.pull_request.title }}
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  team:
+    # ⚠️ THE CEILING, NOT THE GRANT. A called workflow's jobs cannot request permissions the caller
+    # did not allow — omit this block and every run dies at startup with "the nested job X is
+    # requesting … but is only allowed …". Each nested job still narrows to its own block; this is
+    # the union of what any of them asks for.
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      actions: read
+      id-token: write
+    uses: matt-whitaker/claude-team/.github/workflows/team.yml@mainline
+    with:
+      project_owner: matt-whitaker
+      project_number: "9"
+      allowed_bots: ""
+      node: false
+      browser: false
+    secrets: inherit
