@@ -4,6 +4,7 @@ import unittest
 TEAM = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/team.yml").read_text()
 ACTION = (pathlib.Path(__file__).resolve().parent.parent / ".github/actions/load-prompt/action.yml").read_text()
 STUB = (pathlib.Path(__file__).resolve().parent.parent / "templates/consumer-stub.yml").read_text()
+SELF = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/claude.yml").read_text()
 
 
 class TeamWorkflow(unittest.TestCase):
@@ -89,3 +90,35 @@ class ReleasePins(unittest.TestCase):
         self.assertEqual(action_refs, {team_ref})
         self.assertEqual(prompt_default, team_ref)
         self.assertEqual(stub_ref, team_ref)
+
+
+class SelfInstall(unittest.TestCase):
+    """This repo consumes itself, and its stub is the ONE pin that must not move at release.
+
+    ReleasePins flips together on a release commit that is tagged and deliberately not merged.
+    `.github/workflows/claude.yml` lives on mainline permanently, so a `vN` written into it would
+    be a fifth pin nothing asserts — and mainline would run its own team on assets from an older
+    version of itself. A blanket mainline -> vN sweep across .github at release time is exactly
+    the plausible edit this catches."""
+
+    def test_the_self_install_tracks_mainline(self):
+        import re
+        ref = re.search(r"uses: matt-whitaker/claude-team/\.github/workflows/team\.yml@(\S+)", SELF).group(1)
+        self.assertEqual(ref, "mainline")
+
+    def test_the_inputs_are_filled_in(self):
+        self.assertNotIn("CHANGE-ME", SELF)
+        self.assertIn("project_owner: matt-whitaker", SELF)
+
+    def test_the_permissions_ceiling_survives(self):
+        # ⚠️ A called workflow cannot request permissions its caller did not grant. Trim any of
+        # these and every run dies at startup, before a job exists to report it.
+        for scope in ("contents: write", "issues: write", "pull-requests: write",
+                      "actions: read", "id-token: write"):
+            self.assertIn(scope, SELF, scope)
+
+    def test_the_triggers_live_in_the_stub(self):
+        # A called workflow's run-name is ignored and its workflow-level concurrency unsupported,
+        # so both belong here rather than upstream.
+        for key in ("on:", "issues:", "issue_comment:", "pull_request:", "run-name:", "concurrency:"):
+            self.assertIn(key, SELF, key)
