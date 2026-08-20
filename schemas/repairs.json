@@ -11,7 +11,7 @@
           "kind": {
             "type": "string",
             "enum": ["board-item", "sub-issue-link", "classification-label"],
-            "description": "board-item: put an issue or PR on the project board. sub-issue-link: parent a child to the issue that owns it. classification-label: apply the epic/spike/bug/story label that says what an issue IS - never a routing label, which is the maintainer decision. ⚠️ Three kinds is the whole repertoire, on purpose: anything else, including a missing branch, goes in `unrepairable` where a human acts on it."
+            "description": "board-item: put an issue or PR on the project board. sub-issue-link: parent a child to the issue that owns it. classification-label: apply the epic/spike/bug/story/task label that says what an issue IS - never a routing label, which is the maintainer decision. ⚠️ Three kinds is the whole repertoire, on purpose: anything else, including a missing branch, goes in `unrepairable` where a human acts on it."
           },
           "target": {
             "type": "string",
@@ -23,7 +23,7 @@
           },
           "label": {
             "type": "string",
-            "description": "For classification-label only: one of epic, spike, bug, story. ⚠️ The hook rejects anything else, so a routing label cannot be applied through here even if asked for."
+            "description": "For classification-label only: one of epic, spike, bug, story, task. ⚠️ The hook rejects anything else, so a routing label cannot be applied through here even if asked for."
           },
           "wrong": {
             "type": "string",
