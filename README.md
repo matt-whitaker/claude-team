@@ -1,6 +1,12 @@
 # claude-team
 
-> **See it live:** [claude-team-example](https://github.com/matt-whitaker/claude-team-example) — the smallest real integration, and this repo's own drill target. Its Actions tab shows the machinery running (and stopping, by design, at the missing-credentials boundary).
+> **See it live:** this repo **runs the team on itself** — the stub in
+> [`.github/workflows/claude.yml`](.github/workflows/claude.yml) calls the very `team.yml` it
+> ships, with its own overlays in [`.claude-team/prompts/`](.claude-team/prompts/). Every routing
+> decision, hook and landing therefore runs against the engine on the way in.
+> [claude-team-example](https://github.com/matt-whitaker/claude-team-example) is the other end of
+> the scale: the smallest real integration, and the drill target, stopping by design at the
+> missing-credentials boundary.
 
 A portable definition of a Claude/GitHub role team — the prompts each role runs on, and the
 scripted hooks that do the bookkeeping around them. A repo **consumes** it by pointing a
@@ -69,7 +75,12 @@ The consumer contract is a ~60-line stub calling the reusable workflow
 runbook — point a Claude session at it together with a target repo and it walks the whole
 install: inputs, stub, overlays, labels, the maintainer's secrets, and the drill that proves it.
 [`claude-team-example`](https://github.com/matt-whitaker/claude-team-example) is a living,
-annotated install.
+annotated install — and **this repo is the other worked example**, consuming its own workflow
+exactly as any other repo does. ⚠️ The dogfooding is not decoration: a change to the job graph,
+the hooks or the landing path is exercised here on the next issue anyone labels, which is why
+that class of breakage surfaces upstream rather than in a consumer. ⚠️ It proves the **scripted**
+half only — whether the model steps run here depends on this repo's own secrets, exactly as it
+does for any consumer, so a green delegate is not evidence that a prompt change is sound.
 
 Nothing in this package names a consuming repo, its branches, its gate or its packages — anything
 that does belongs in your overlay.
