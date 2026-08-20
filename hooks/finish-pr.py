@@ -123,15 +123,40 @@ if not pr:
         + (f"\nCloses #{ISSUE}\n" if ISSUE else "")
     )
 
+    # ⚠️ PUSH BEFORE OPENING, or none of this recovers anything. `gh pr create --head <branch>`
+    # requires the branch to exist ON THE REMOTE, and the branch a stranded run committed to may
+    # never have been pushed: `work-completion.py` declines to land when the issue carries no
+    # Branch line, which is every issue a maintainer files by hand and triggers at an author
+    # directly with a handle. Measured on brewdocs.beer run 32329373927 — one commit, no push,
+    # `pr create` failed, and the warning this replaces sent the maintainer after a branch that
+    # died with the runner minutes later.
+    if not team.authenticate_git():
+        team.fail(
+            f"This run produced {stranded} and there is no token to push it with. The work "
+            f"exists only on this runner and is lost when it is torn down."
+        )
+    pushed = subprocess.run(
+        ["git", "push", "origin", f"HEAD:refs/heads/{branch}"],
+        capture_output=True, text=True, check=False,
+    )
+    if pushed.returncode != 0:
+        team.fail(
+            f"This run produced {stranded} and the branch could not be pushed, so the work is "
+            f"lost with the runner: {team.scrub((pushed.stderr or pushed.stdout).strip())}"
+        )
+
     if team.gh(
         "pr", "create", "--repo", team.REPO, "--base", base, "--head", branch,
         "--title", title, "--body", body,
     ) is None:
-        team.warn(
-            f"This run produced {stranded} and I could not open a PR for it. "
-            f"Recover with: git push origin origin/{branch}:refs/heads/<the-branch-you-wanted>"
+        # ⚠️ FAIL, do not warn-and-exit-0. A run that produced commits and landed none is not a
+        # success, and reporting one is how #530's class of loss stays invisible. The commits are
+        # safe on the remote by this point, so the recovery below is real rather than a command
+        # that only worked on a runner that no longer exists.
+        team.fail(
+            f"This run produced {stranded}, now pushed to `{branch}`, but no PR could be opened "
+            f"for it. The commits are safe on the remote — open a PR from that branch by hand."
         )
-        raise SystemExit(0)
 
     found = team.gh_json(
         "pr", "list", "--repo", team.REPO, "--head", branch, "--state", "open", "--json", "number"
