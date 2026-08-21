@@ -98,32 +98,45 @@ def derived_order() -> list[int]:
 
 
 def sequencing_waves(body: str) -> list[list[int]]:
-    """Waves from the Architect's section; the derived order, one task per wave, without one."""
-    match = re.search(r"(?im)^(?:#{2,4}\s*sequencing\b|\*\*sequencing[.:]?\*\*)", body)
+    """Waves from the Architect's section; the derived order, one task per wave, without one.
+
+    ⚠️ A SECTION THAT PARSES TO NOTHING MUST SAY SO. Falling back to derived order is correct and
+    stays — what cost the diagnosis in #28 was doing it in silence. A near-miss ref already warns;
+    a section naming nothing at all did not, so the loudest signal went to the smaller problem.
+
+    ⚠️ It is not cosmetic, because the numbered form is the containment for a *different* defect.
+    A task the section forgets is appended after the listed waves, deliberately — so a
+    mis-parented foreign task runs last. With the section inert, everything falls to derived
+    order, that task sorts by its role phase, and a foreign `writer` dispatches ahead of the
+    story's own implementor. Measured on a consumer at `v1.1`: a filing error became a
+    dispatch-order error precisely because the section was prose.
+    """
+    parsed = team.sequencing_refs(body)
+    if parsed is None:
+        return [[n] for n in derived_order()]
+    if not parsed:
+        team.warn(
+            f"#{STORY} has a Sequencing section but no numbered refs — falling back to derived "
+            "order. The format is numbered lines carrying #refs; prose naming roles rather than "
+            "issue numbers parses to nothing, and a mis-parented task then jumps the queue "
+            "instead of running last."
+        )
+    seen: set[int] = set()
     waves: list[list[int]] = []
-    if match:
-        seen: set[int] = set()
-        for line in body[match.end():].splitlines():
-            if re.match(r"^#{1,6}\s", line):
-                break
-            if not re.match(r"^\s*\d+[.)]", line):
-                continue
-            refs = [int(n) for n in re.findall(r"#(\d+)", line)]
-            wave = []
-            for n in refs:
-                if n not in by_number:
-                    team.warn(f"sequencing names #{n}, which is not one of #{STORY}'s tasks — dropped.")
-                elif n not in seen:
-                    seen.add(n)
-                    wave.append(n)
-            if wave:
-                waves.append(wave)
-        # ⚠️ A task the section forgot is appended, never stranded.
-        for n in derived_order():
-            if n not in seen:
-                waves.append([n])
-    if not waves:
-        waves = [[n] for n in derived_order()]
+    for refs in parsed:
+        wave = []
+        for n in refs:
+            if n not in by_number:
+                team.warn(f"sequencing names #{n}, which is not one of #{STORY}'s tasks — dropped.")
+            elif n not in seen:
+                seen.add(n)
+                wave.append(n)
+        if wave:
+            waves.append(wave)
+    # ⚠️ A task the section forgot is appended, never stranded.
+    for n in derived_order():
+        if n not in seen:
+            waves.append([n])
     return waves
 
 

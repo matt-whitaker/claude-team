@@ -19,6 +19,7 @@ GH_TOKEN = os.environ.get("GH_TOKEN", "")
 branch_line = _real.branch_line
 role_stamp = _real.role_stamp
 story_from_branch = _real.story_from_branch
+sequencing_refs = _real.sequencing_refs
 titled_epic = _real.titled_epic
 titled_spike = _real.titled_spike
 titled_bug = _real.titled_bug

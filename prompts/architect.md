@@ -167,11 +167,25 @@ roles' territory, that is a sign it is two tasks.
 
 ⚠️ **A story's tasks ARE sequenced — that is the default, and the opposite of the story rule.**
 Stories are independent unless the epic says otherwise; a story's tasks are ordered unless you
-say otherwise. Say so in the story body, so nobody has to infer it from the numbering:
+say otherwise. Say so in the story body, in the **same numbered form** as above:
 
 ```
-**Sequencing.** Its tasks run in order: #606, then #607, then #608.
+### Sequencing
+1. #606
+2. #607
+3. #608
 ```
+
+⚠️ **NEVER AS PROSE, AND THIS EXAMPLE USED TO BE PROSE.** `**Sequencing.** Its tasks run in
+order: #606, then #607, then #608.` reads perfectly and parses to **nothing**: the heading
+matches, the refs sit on the heading line, and `dispatch-next.py` only reads refs from lines
+that *start* with a number. Two sibling stories shipped that form with roles instead of numbers
+— *"writer, then implementor, then tester"* — and both silently ran on derived order.
+
+⚠️ **The numbered form is not documentation, it is containment.** A task the section forgets is
+appended *after* the listed waves. So when a task is mis-parented onto the wrong story, the
+numbered form makes it run last; with the section inert, it sorts by role phase and can dispatch
+*ahead* of the story's own work. Prose turns a filing error into a dispatch-order error.
 
 ⚠️ **Create tasks in the order they should be run.** That order is read, not just described:
 a hook lists the story's tasks by `(phase, issue number)` and names the next one to trigger,
