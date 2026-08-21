@@ -57,7 +57,28 @@ def check_deliverable() -> None:
         print(f"#{ISSUE} is {'an epic' if KIND == 'epic' else 'a spike'} — no Branch line expected.")
         return
 
-    if team.branch_line(team.issue_body(ISSUE)):
+    body = team.issue_body(ISSUE)
+
+    # ⚠️ A SECTION THAT PARSES TO NOTHING IS CAUGHT HERE, NOT AT DISPATCH. `dispatch-next.py`
+    # warns too, but only when someone dispatches — which may be days later, or never, and by
+    # then nobody is watching the run that caused it. Here it lands on the Architect run that
+    # wrote it, while a human is still looking.
+    #
+    # ⚠️ WARN, DO NOT FAIL. Derived order is a working fallback, so the story is not broken the
+    # way a missing Branch line breaks it — that one fails because nothing downstream can work at
+    # all. Failing here would be disproportionate, and the fallback is deliberately kept.
+    #
+    # ⚠️ Not applied to an epic: its section is read by `file-sub-issues.py`, whose parser takes
+    # any `#N` on any line in the section, so the prose form is legitimate there. Two parsers,
+    # two strictnesses — which is exactly why this check sits behind the epic/spike return above.
+    if team.sequencing_refs(body) == []:
+        team.warn(
+            f"#{ISSUE} has a Sequencing section that names no numbered refs, so dispatch will "
+            "fall back to derived order. Write it as numbered lines carrying #refs — that form "
+            "is also what keeps a mis-parented task running last instead of jumping the queue."
+        )
+
+    if team.branch_line(body):
         print(f"#{ISSUE} carries its Branch line — the Architect delivered.")
         return
 

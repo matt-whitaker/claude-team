@@ -133,6 +133,31 @@ must be stated where it can be seen:
   start the next wave; a task the section forgot is appended in derived `(phase, issue number)`
   order rather than stranded, and with no section at all tasks run one at a time in that derived
   order. The same section is what the human reads when driving by hand.
+  - ⚠️ **A SECTION THAT PARSES TO NOTHING IS NOT THE SAME AS NO SECTION, AND FOR ONE RELEASE BOTH
+    WERE SILENT.** `sequencing_refs()` only reads refs from lines that *start* with a number, so a
+    section written as prose — *"Its tasks run in order: writer, then implementor, then tester"* —
+    reads correctly to a human, satisfies any check looking for the heading, and carries no
+    instruction at all. A ref naming something outside the story already warned; a section naming
+    **nothing** did not, so the loud signal went to the smaller problem. Both callers now say so,
+    and the fallback to derived order is deliberately kept — falling back is right, doing it in
+    silence is what cost the diagnosis.
+  - ⚠️ **THE ROOT CAUSE WAS THE ARCHITECT PROMPT'S OWN WORKED EXAMPLE.** It demonstrated
+    `**Sequencing.** Its tasks run in order: #606, then #607, then #608.` — which matches the
+    heading, puts its refs on the heading line, and parses to zero waves. Two sibling stories
+    shipped that form with roles instead of numbers and both ran on derived order. The parser was
+    never wrong; the instruction was. ⚠️ A test now parses every Sequencing example in the prompt,
+    because prose review had already passed this twice.
+  - ⚠️ **THE NUMBERED FORM IS CONTAINMENT, NOT DOCUMENTATION**, which is the reason this is worth
+    fixing rather than filing as cosmetic. A task the section forgets is appended *after* the
+    listed waves, deliberately — so a task mis-parented onto the wrong story runs last. With the
+    section inert everything falls to derived order, that foreign task sorts by its role phase, and
+    a stray `writer` dispatches **ahead of the story's own implementor**. Measured on a consumer at
+    `v1.1`: the prose form is what turned a filing error into a dispatch-order error.
+  - ⚠️ **AN EPIC'S SECTION IS PROSE AND THAT IS CORRECT** — two forms, two parsers, and one looks
+    exactly like the trap. `file-sub-issues.py` takes any `#N` on any line of an epic's section, so
+    the inline form is legitimate there; the identical form on a *story* is the defect above. The
+    custodial check is therefore scoped behind the epic/spike return, and a test pins both so
+    nobody harmonises one example to match the other.
   - ⚠️ **THE FIRST WAVE NEEDS ITS OWN IGNITION, and for one release it had none.** The hook chains
     task N to task N+1 from the authors job, so a story could be *continued* but never *begun* —
     the maintainer still hand-labelled task 1, which is the gesture the cascade existed to remove

@@ -185,6 +185,48 @@ def role_stamp(body: str) -> str:
     return found.group(1).lower() if found else ""
 
 
+_SEQ_HEADING = re.compile(r"(?im)^(?:#{2,4}\s*sequencing\b|\*\*sequencing[.:]?\*\*)")
+
+
+def sequencing_refs(body: str) -> list[list[int]] | None:
+    """The Architect's `Sequencing` section, parsed to waves of raw issue numbers.
+
+    Three outcomes, and keeping them distinct is the whole point:
+
+      None  no section at all — legitimate, documented, and the caller falls back silently
+      []    a section IS present and yields nothing a hook can act on
+      [[…]] one list per numbered line, in order
+
+    ⚠️ `[]` AND `None` ARE NOT THE SAME THING, and collapsing them is what made #28 silent. A
+    section naming a ref outside the story already warns; a section naming *nothing* did not, so
+    an Architect could write something that reads correctly to a human, satisfies any check
+    looking for the heading, and carries no instruction at all — with the run reporting nothing.
+
+    ⚠️ THE PROMPT'S OWN WORKED EXAMPLE PRODUCED `[]`. `**Sequencing.** Its tasks run in order:
+    #606, then #607, then #608.` matches the heading, puts its refs on the heading line, and so
+    parses to zero waves — the refs are right there and unreachable. Two sibling stories shipped
+    that form verbatim minus the numbers. The parser is not what was wrong; the instruction was.
+
+    ⚠️ Parsing only — no validation. Whether a ref is one of the story's tasks is the caller's
+    question, because the two callers want different answers: dispatch drops a foreign ref with a
+    warning, while the custodial check only asks whether the section says anything at all. One
+    parser, so they cannot disagree about what a section *is*.
+    """
+    match = _SEQ_HEADING.search(body)
+    if not match:
+        return None
+    waves: list[list[int]] = []
+    for line in body[match.end():].splitlines():
+        if re.match(r"^#{1,6}\s", line):
+            break
+        if not re.match(r"^\s*\d+[.)]", line):
+            continue
+        refs = [int(n) for n in re.findall(r"#(\d+)", line)]
+        if refs:
+            waves.append(refs)
+    return waves
+
+
 EPIC_LABEL = "epic"
 SPIKE_LABEL = "spike"
 BUG_LABEL = "bug"
