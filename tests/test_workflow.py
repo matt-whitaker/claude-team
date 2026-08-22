@@ -213,6 +213,41 @@ class CanonicalLabels(unittest.TestCase):
                     len(l["description"]), 100,
                     f"{l['name']} is {len(l['description'])} chars; gh will reject it")
 
+    def test_no_two_labels_share_a_colour_unless_the_pairing_is_deliberate(self):
+        """⚠️ THE COLOUR IS THE ONLY THING A BOARD SHOWS AT A GLANCE, and this set carries two
+        kinds of label for two different readers: ROUTING says what should happen to an issue and
+        is the maintainer's, CLASSIFICATION says what an issue is and anyone filing may apply it.
+        `story` shipped in the tester's green and `task`/`spike` in the authors' blue, so the
+        board erased that line exactly where CLAUDE.md draws it in prose.
+
+        Three pairings are deliberate — shaping, authoring, done — and they are enumerated here
+        rather than derived, so a fourth is an edit someone has to argue for. The assertion runs
+        both ways: nothing else may collide, and these three may not be silently split.
+
+        ⚠️ Pinned as the GENERAL rule rather than as the three collisions that were found. The
+        next colour edit will be somewhere else in the set, and a test naming only today's
+        offenders would pass through the same mistake made one label over."""
+        deliberate = {
+            frozenset({"@claude/architect", "@claude/researcher"}),
+            frozenset({"@claude/implementor", "@claude/designer"}),
+            frozenset({"@claude/tester", "@claude/complete"}),
+        }
+        groups = {}
+        for l in self.labels:
+            groups.setdefault(l["color"], set()).add(l["name"])
+        for color, names in sorted(groups.items()):
+            with self.subTest(color=color):
+                if len(names) > 1:
+                    self.assertIn(
+                        frozenset(names), deliberate,
+                        f"{sorted(names)} all share #{color}; only the role pairings may")
+        by_name = {l["name"]: l["color"] for l in self.labels}
+        for pair in deliberate:
+            a, b = sorted(pair)
+            with self.subTest(pairing=(a, b)):
+                self.assertEqual(by_name[a], by_name[b],
+                                 f"{a} and {b} are a deliberate pairing and must stay one colour")
+
     def test_the_task_description_does_not_claim_a_task_owns_a_pr(self):
         """⚠️ IT SHIPPED SAYING THE OPPOSITE OF THE HIERARCHY: "A slice of a story, with its own
         branch and PR" — a fossil of the version before task PRs were removed.
