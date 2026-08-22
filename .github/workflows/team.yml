@@ -1726,6 +1726,12 @@ jobs:
           # left it off had that decision overwritten, and #617 closed as completed with its
           # wiring never written.
           HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output || steps.tester.outputs.structured_output || steps.writer.outputs.structured_output }}
+          # ⚠️ What the completion hook already landed, and the only thing separating a run
+          # whose commits are safe on the story branch from one whose commits are stranded. Without
+          # it this hook read "no PR for this branch" as "nothing was landed", announced the run's
+          # own throwaway branch as where the work was safe — a ref that is never pushed and dies
+          # with the runner — and opened a second PR for work that already had one coming.
+          LANDED_REF: ${{ steps.completion.outputs.landed_ref }}
         run: "$RUNNER_TEMP/agent-bin/finish-pr.py"
       - name: Persist the author's handoff
         if: always()

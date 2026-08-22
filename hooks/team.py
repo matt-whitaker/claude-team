@@ -88,6 +88,22 @@ def warn(message: str) -> None:
     print(f"::warning::{message}")
 
 
+def gh_raw(*args: str) -> subprocess.CompletedProcess:
+    """`gh`, with the failure preserved — for the few callers that must REPORT why.
+
+    ⚠️ `gh()` drops the reason on the floor, deliberately: a caller that only needs to know
+    whether something worked must not be handed an error body it might mistake for data. But a
+    hook whose whole job is the thing that just failed has to say what went wrong, and #27 is
+    what that costs — `open-story-pr.py` failed the run with "open it by hand" and no cause, on
+    a create that genuinely should have succeeded.
+
+    ⚠️ ANYTHING PRINTED FROM THIS MUST GO THROUGH `scrub()`. The token is in the remote URL, git
+    and gh both echo that URL in errors, and Actions masks secrets in the LOG only — a hook
+    posting this into an issue comment is writing outside that protection.
+    """
+    return subprocess.run(["gh", *args], capture_output=True, text=True, check=False)
+
+
 def gh(*args: str, check: bool = False) -> str | None:
     """Run a `gh` command and return stdout, or None if it failed.
 
@@ -95,10 +111,10 @@ def gh(*args: str, check: bool = False) -> str | None:
     successful response to anything that only checks for output. Callers used to capture
     that JSON blob and treat it as a value. Here a non-zero exit returns None, full stop,
     and there is no way for an error body to be mistaken for data.
+
+    Need the reason rather than the value? Use `gh_raw()`.
     """
-    result = subprocess.run(
-        ["gh", *args], capture_output=True, text=True, check=False
-    )
+    result = gh_raw(*args)
     if result.returncode != 0:
         if check:
             fail(f"gh {' '.join(args)} failed: {result.stderr.strip()}")

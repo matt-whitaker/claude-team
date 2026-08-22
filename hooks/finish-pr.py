@@ -26,6 +26,7 @@ import team
 
 ROLES = os.environ.get("ROLES") or team.fail("ROLES is required")
 ISSUE = os.environ.get("ISSUE", "")
+LANDED_REF = os.environ.get("LANDED_REF", "")
 HANDOFF = os.environ.get("HANDOFF", "")
 
 if not team.REPO:
@@ -76,6 +77,22 @@ if not pr:
     #
     # So before accepting "nothing to finish", check whether this run actually produced
     # commits. If it did, say so loudly and leave the recovery command on the issue.
+    # ⚠️ A LANDED COMMIT IS NOT STRANDED, and counting `origin/<default>..HEAD` cannot tell the
+    # difference. `work-completion.py` lands the run's work onto the story branch and the
+    # RUNNER's branch still carries it, so the count stays non-zero and this hook announced work
+    # as lost that was already safe — then sent the reader to the staging branch to open a PR
+    # from, when the work was on the story branch (#44). Measured on run 32561656056: two
+    # `::error::` lines for one fault, and the louder one was the false one.
+    #
+    # ⚠️ `landed_ref` already existed as a `work-completion.py` output; it was simply never given
+    # to this step. The signal was produced and had one reader.
+    if LANDED_REF:
+        print(
+            f"this run's work landed on `{LANDED_REF}` — not stranded. Its PR belongs to "
+            "open-story-pr.py, which reports its own failure."
+        )
+        raise SystemExit(0)
+
     stranded = ""
     default = (
         team.gh_json("repo", "view", team.REPO, "--json", "defaultBranchRef") or {}

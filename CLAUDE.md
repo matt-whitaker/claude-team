@@ -263,6 +263,27 @@ incident here was caught precisely because something looked wrong. ⚠️ The ca
 when ahead-ness cannot be determined it pushes anyway, because an empty branch is noise and a lost
 capture is the thing the hook exists to prevent.
 
+⚠️ **AND A SUCCESSFUL LANDING SAID IT TOO, WHICH IS WORSE.** `finish-pr.py` finds no PR for the
+run's branch — correct, the story's PR is `open-story-pr.py`'s to open — and then asks whether the
+run produced commits by counting `origin/<default>..HEAD`. `work-completion.py` has already pushed
+those commits onto the story branch and **the runner's branch still carries them**, so that count
+is non-zero on every landing that ever worked. The hook therefore declared landed work stranded,
+pushed the throwaway branch, opened a **second** PR for work that already had one coming, and named
+the runner's branch as where the commits were safe. Measured on run 32561656056: two `::error::`
+lines for one fault, and the louder one was the false one (#44).
+⚠️ **THE DISCRIMINATOR ALREADY EXISTED AND HAD ONE READER.** `work-completion.py` writes
+`landed_ref` to `$GITHUB_OUTPUT`; the workflow read it to set `BASE` for `open-story-pr.py` and
+never gave it to this step, so the hook saw an empty string forever. **This is the sixth dead
+channel here** — after `DEFAULTED`, the author handoff, `decisions` on the PR path,
+`docsCandidates`, and `unrepairable` — and the first where the channel had a reader and simply
+missed a second one, which is why nothing looked wrong. ⚠️ A test now asserts that **every env var
+any hook reads is set somewhere in `team.yml`**: a var read and never set can only ever be empty,
+and that is checkable without knowing which step should set it.
+⚠️ **Counting commits cannot answer this and never could.** A landed commit and a stranded one are
+byte-identical on the runner; the only thing separating them is whether a push happened, which is a
+fact the landing hook holds and the count does not. ⚠️ Any future "did this run produce anything"
+predicate must read the landing's own report, not the graph.
+
 ⚠️ **A rejected landing reconciles by merge**: `work-completion.py` pulls latest, commits the
   merge commit, and pushes. A merge that **conflicts** is not resolved by script — the step fails
   with `unlandable=true`, the commits stay on the run's branch, and resolution is an Implementor
@@ -995,7 +1016,7 @@ forgotten by a model that ran out of turns or simply skipped it.
 | `work-completion.py` | post, authors | commits the run's changes (message from the handoff's `commitMessage`), lands them on the story's branch — reconciling a rejected push by merge — and closes the task; a **conflicted** merge fails the step with `unlandable=true` |
 | `capture-failure.py` | post, authors — only when a model step failed or the landing conflicted | pushes the run's changes to `failure/<task#>-<run#>-<attempt>` and appends a recovery report on the issue; never fails, never masks the real error |
 | `dispatch-next.py` | post, authors when the landing **closed** the task; **post, Architect** (after the branch exists); **in `delegate`** when an already-shaped story is triggered | reads the story's `### Sequencing` section (derived order without one), and adds `@claude` to every open, unlabelled task in the earliest incomplete wave — the cascade, dark when the App secrets are absent |
-| `finish-pr.py` | post, authors | the net behind `open-story-pr.py` on the as-is path — labels the PR and reconciles the closing keyword with `remaining`. Returns immediately for a task, which has no PR. ⚠️ Also the net under **stranded commits**: a run that committed with nowhere to land gets its branch **pushed** and a PR opened, and **fails the run** if either step cannot happen — pushing first is what makes the recovery real, since `gh pr create --head` needs the branch on the remote and the runner dies moments later (#13) |
+| `finish-pr.py` | post, authors | the net behind `open-story-pr.py` on the as-is path — labels the PR and reconciles the closing keyword with `remaining`. Returns immediately for a task, which has no PR. ⚠️ Also the net under **stranded commits**: a run that committed with nowhere to land gets its branch **pushed** and a PR opened, and **fails the run** if either step cannot happen — pushing first is what makes the recovery real, since `gh pr create --head` needs the branch on the remote and the runner dies moments later (#13). ⚠️ Reads `LANDED_REF` to tell a landing from a loss |
 | `apply-repairs.py` | post, the root role | applies the process repairs it named, records each with what was wrong and why, **reports what it would not fix onto the trigger**, and files an issue rather than repairing the same thing twice |
 | `post-findings.py` | post, Researcher | renders its schema-forced findings onto the spike — the role has no shell, so this is the only way they reach anyone |
 | `post-handoff.py` | post, authors | posts the JSON handoff to the story's issue, and appends its `decisions` to one running log there |
@@ -1081,6 +1102,13 @@ turns and cannot be forgotten.
   ⚠️ The general lesson, since this is the third instance: **a hook that is the sole mechanism for
   something must fail loudly when it cannot do it.** Best-effort is right for bookkeeping that a
   human would notice missing; it is wrong for the only thing that opens a PR.
+  ⚠️ **AND FAILING LOUDLY IS NOT THE SAME AS FAILING USEFULLY.** For as long as it failed, it
+  failed with *"open it by hand"* and no cause (#27) — on a hook where every benign path has
+  already returned, so reaching that line always means a PR genuinely should exist and something
+  refused. Every diagnosis therefore started from zero. It uses `team.gh_raw()` now and prints
+  what `gh` said, plus the two causes that account for most of them — the *Allow GitHub Actions
+  to create and approve pull requests* checkbox, and a job holding `pull-requests: read`. Naming
+  them is not a diagnosis; the reason is. It is what stops the reader re-deriving both each time.
 - ⚠️ **A job that can be triggered on a PR needs `pull-requests: write`, not `issues: write`, to
   say anything at all.** Commenting on a PR goes through the `/issues/{n}/comments` endpoint — so
   the API reads as if `issues` covers it — but the permission GitHub checks is `pull-requests`.
@@ -1222,3 +1250,13 @@ unparented, which is most issues, and `compare` 404s for a deleted branch. `team
 returns `None` on a non-zero exit and `gh_json()` parses only what succeeded, so an error
 body can no longer reach a caller. ⚠️ Do not add a hook that runs `gh` any other way — this
 trap survived being documented and was written again anyway, twice.
+
+⚠️ **`team.gh_raw()` IS THE ONE EXIT, AND IT IS FOR REPORTING, NEVER FOR READING.** Dropping the
+reason is right for a caller that only needs to know whether something worked, and wrong for a
+hook whose whole job is the thing that just failed — `open-story-pr.py` failed the run with no
+cause for as long as it existed (#27). So `gh()` still returns `None` and nothing changes for its
+callers; `gh_raw()` hands back the `CompletedProcess` and is reserved for the message. ⚠️ **Never
+parse its stdout** — that is the trap above, re-opened. ⚠️ **And anything printed from it goes
+through `scrub()` first**: the token rides in the remote URL, `gh` and git both echo that URL in
+errors, and Actions masks the **log** only, so a hook one edit away from posting this to an issue
+is writing outside that protection.

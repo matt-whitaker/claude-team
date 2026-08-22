@@ -76,6 +76,20 @@ def is_epic(number):
     return kind(number) == "epic"
 
 
+class _Result:
+    def __init__(self, rc, out, err):
+        self.returncode, self.stdout, self.stderr = rc, out, err
+
+
+def gh_raw(*args):
+    _record("gh_raw", args)
+    joined = " ".join(map(str, args))
+    for needle in json.loads(os.environ.get("STUB_GH_FAIL", "[]")):
+        if needle in joined:
+            return _Result(1, "", os.environ.get("STUB_GH_STDERR", "GraphQL: refused"))
+    return _Result(0, "", "")
+
+
 def gh(*args, check=False):
     _record("gh", args)
     joined = " ".join(map(str, args))
