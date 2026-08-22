@@ -97,8 +97,10 @@ someone reading silence as failure.
 
 ## 6. The maintainer's half — file it, don't do it
 
-Secrets never pass through a session. File an issue on the target listing what to paste into
-*Settings → Secrets and variables → Actions*, split by consequence:
+Secrets never pass through a session, and neither do repository settings. File an issue on the
+target listing what the maintainer has to set by hand, split by consequence.
+
+### Secrets — *Settings → Secrets and variables → Actions*
 
 - **Required** — `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`; issuing a new one does
   not revoke tokens other repos hold). Without it every routed run fails at its model step in
@@ -116,6 +118,20 @@ carries what each item buys, what breaks without it, and where to obtain it — 
 need more than a secret pasted. Two copies of this list is how they drift, and the copy a
 maintainer follows is the one that has to be right.
 
+### Settings — *Settings → Actions → General*
+
+⚠️ **"Allow GitHub Actions to create and approve pull requests" must be ON**, or a story's PR is
+never opened. `open-story-pr.py` runs with `secrets.GITHUB_TOKEN`, and with that box unchecked
+GitHub refuses the create whatever the `permissions:` block says — so the `pull-requests: write`
+the stub already grants is neither sufficient nor the thing to check when this fails.
+
+⚠️ **It fails late, and it fails looking like an engine bug.** Nothing exercises the story-PR
+path until the first story finishes its *last* task, which can be days after the drill below has
+passed. It then surfaces as a red `Open the story's PR when the last task lands` step reading
+*"could not open the story PR — open it by hand"*, with the story's work sitting unmerged on a
+branch nobody is watching. On the consumer that found it, three stories needed their PRs opened
+by hand first, and the cause took a differential against a working install to locate.
+
 ## 7. The drill — what proves it
 
 After merge and the required secret: file a small **real** issue (a genuine question or task —
@@ -131,6 +147,11 @@ wrong run. Expected anatomy:
   Researcher without consulting a model).
 - The routed role runs to a real result. If the token is missing it fails env-validation in
   ~3 seconds — that is the boundary behaving, and the drill passes for everything scripted.
+
+⚠️ **The drill stops here, and the install does not.** Routing and one role are all it proves.
+The cascade, the story PR and the create-PR setting above are first exercised when a real story
+finishes its last task — so treat that first completed story as the second half of the drill,
+and read its final run's steps the same way.
 
 ⚠️ Two disciplines for every comment you write near a live install: the literal handle (the
 `@`-prefixed label name) in any issue or PR comment **starts a run — backticks do not protect
