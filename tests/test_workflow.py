@@ -1,4 +1,5 @@
 import pathlib
+import re
 import unittest
 
 TEAM = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/team.yml").read_text()
@@ -63,6 +64,46 @@ class TeamWorkflow(unittest.TestCase):
                     break
                 self.assertFalse(nxt.strip().startswith("#"),
                                  f"comment inside if block at line {j+1}")
+
+
+class NoHookReadsAChannelNobodyFills(unittest.TestCase):
+    """⚠️ THE DEAD CHANNEL IS THIS PACKAGE'S MOST-REPEATED DEFECT — `DEFAULTED`, the author
+    handoff, `decisions` on the PR path, `docsCandidates`, `unrepairable`, and #44: a signal
+    produced, consumed by nobody, and believed to work because nothing fails when it is absent.
+
+    `finish-pr.py` is the sixth. `work-completion.py` had emitted `landed_ref` for as long as it
+    had existed and the workflow read it at ONE of its two readers, so the hook that needed it to
+    tell a landing from a loss saw an empty string forever — announced landed work as stranded,
+    pushed the runner's throwaway branch, and named a ref that dies with the container as where
+    the commits were safe.
+
+    ⚠️ This asserts the WIRING, not the value: a var read by a hook and set nowhere in the
+    workflow can only ever be empty. It cannot check that the right STEP sets it — several hooks
+    take different vars per mode, and demanding all of them at every site would be false — so a
+    per-hook test still has to cover which site."""
+
+    HOOKS = pathlib.Path(__file__).resolve().parent.parent / "hooks"
+    # Actions sets these itself, and the test harness sets the last two.
+    AMBIENT = {"GITHUB_OUTPUT", "RUNNER_TEMP", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT",
+               "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "HOOKS_DIR", "CALLS_FILE"}
+
+    def test_every_env_var_a_hook_reads_is_set_somewhere(self):
+        for hook in sorted(self.HOOKS.glob("*.py")):
+            src = hook.read_text()
+            reads = set(re.findall(
+                r"os\.environ(?:\.get)?[\(\[]\s*\"([A-Z][A-Z0-9_]*)\"", src))
+            for name in sorted(reads - self.AMBIENT):
+                with self.subTest(hook=hook.name, var=name):
+                    # `NAME:` in an env block, or `NAME=` inline on a run line.
+                    self.assertRegex(
+                        TEAM, rf"(^|[\s;]){name}[:=]",
+                        f"{hook.name} reads {name}; team.yml never sets it, so it is always empty",
+                    )
+
+    def test_finish_pr_is_told_what_the_landing_landed(self):
+        """The specific wiring #44 was missing — the hook cannot distinguish a landed run from
+        a stranded one without it, and both look identical from `origin/<default>..HEAD`."""
+        self.assertIn("LANDED_REF: ${{ steps.completion.outputs.landed_ref }}", TEAM)
 
 
 class ReadmeDocumentsEveryInput(unittest.TestCase):

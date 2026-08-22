@@ -94,10 +94,11 @@ if tasks:
     # ⚠️ Kept explicit because the correct rule with a stale reason attached is exactly what gets
     # "simplified" away by someone who notices only that the reason is wrong.
 
-if team.gh(
+created = team.gh_raw(
     "pr", "create", "--repo", team.REPO, "--base", default, "--head", BASE,
     "--title", title, "--body", "\n".join(lines) + "\n",
-) is not None:
+)
+if created.returncode == 0:
     print(f"opened the story PR for {BASE}")
 else:
     # ⚠️ FAILS THE STEP, and that is the whole lesson of this hook's history. It warned instead,
@@ -109,4 +110,19 @@ else:
     # ⚠️ Reaching this line means a PR genuinely should exist: every benign case — merged into the
     # default branch, an unresolvable story, a PR already open, a branch not ahead — returned
     # earlier. So there is no legitimate reason to be here and quiet.
-    team.fail(f"could not open the story PR for {BASE} — open it by hand.")
+    # ⚠️ SAY WHY. It failed with no cause for as long as it existed (#27), so every diagnosis
+    # started from zero on a hook whose benign paths have all already returned. `gh` writes its
+    # refusal to stdout as often as stderr, so both are read; `scrub()` because the token rides
+    # in the remote URL and Actions masks the log, not an issue comment.
+    #
+    # ⚠️ The two known causes are named because neither is guessable from `gh`'s own wording:
+    # the repository setting is a checkbox nobody remembers, and the permission is a one-line
+    # workflow edit. Naming them is not a diagnosis — the reason above is — it is what stops the
+    # reader re-deriving both every time.
+    reason = team.scrub((created.stderr or created.stdout).strip()) or "no reason reported"
+    team.fail(
+        f"could not open the story PR for {BASE} — open it by hand. gh said: {reason} "
+        "Two causes account for most of these: 'Allow GitHub Actions to create and approve "
+        "pull requests' is off in Settings -> Actions -> General, or the job lacks "
+        "`pull-requests: write`."
+    )
