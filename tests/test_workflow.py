@@ -203,3 +203,33 @@ class CanonicalLabels(unittest.TestCase):
     def test_onboarding_points_at_the_file_rather_than_listing_them(self):
         self.assertIn("templates/labels.json", self.onboarding)
 
+    def test_no_description_exceeds_githubs_limit(self):
+        """⚠️ GitHub caps a label description at 100 characters, and `gh label create` FAILS over
+        it — so an over-long description does not degrade, it breaks the install loop partway
+        through and leaves the set half-applied."""
+        for l in self.labels:
+            with self.subTest(label=l["name"]):
+                self.assertLessEqual(
+                    len(l["description"]), 100,
+                    f"{l['name']} is {len(l['description'])} chars; gh will reject it")
+
+    def test_the_task_description_does_not_claim_a_task_owns_a_pr(self):
+        """⚠️ IT SHIPPED SAYING THE OPPOSITE OF THE HIERARCHY: "A slice of a story, with its own
+        branch and PR" — a fossil of the version before task PRs were removed.
+
+        The PR is owned at the STORY level, which includes an unparented task or a bug;
+        `CLAUDE.md:215` is the mechanism — when `story_from_branch(named) == ISSUE` the executing
+        issue owns the branch and carries the PR, when they differ it is a task and it does not.
+
+        A label description is read exactly when someone is unsure what the kind means, so it is
+        wrong at the only moment it matters — and this file is the canon every consumer applies,
+        so the error ships rather than staying local.
+        """
+        import re
+        desc = next(l["description"] for l in self.labels if l["name"] == "task")
+        self.assertIn("story's branch", desc,
+                      "the task description must say where its commits actually land")
+        self.assertIsNone(
+            re.search(r"(?i)\bits own\b[^.]*\bPR\b", desc),
+            "the task description claims a task has its own PR; the story level owns it")
+

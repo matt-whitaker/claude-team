@@ -27,7 +27,7 @@
   {
     "name": "@claude/writer",
     "color": "5319e7",
-    "description": "Claude: update documentation"
+    "description": "Claude: the product specification first, then documentation \u2014 runs before the authors"
   },
   {
     "name": "@claude/researcher",
@@ -67,6 +67,6 @@
   {
     "name": "task",
     "color": "1d76db",
-    "description": "A slice of a story, with its own branch and PR"
+    "description": "A slice of a story \u2014 its commits land on the story's branch, and the story owns the PR"
   }
 ]
