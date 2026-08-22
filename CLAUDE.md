@@ -33,6 +33,11 @@ these files; extended by a per-role overlay in the consuming repo.
 Routing is a script first: state decides wherever state can, and a model is consulted only where it cannot — a bare mention that could be a question or a request, a stamp that is missing — with the script's own answer as the floor when the consultation fails. Every hook is deterministic and derives its input from
 state, not from something a model was asked to leave behind.
 
+⚠️ **A cloud session should read `CLAUDE_CLOUD.md` first** — what a local session gets from
+memory and `~/.claude/`, which do not reach a cloud container at all. It is mentioned in backticks
+deliberately: an unbackticked `@path` is a real, unconditional import, and importing it would load
+cloud-only instructions into every local session.
+
 ## The issue hierarchy
 
 | level | branch | its PR targets | closed by |
