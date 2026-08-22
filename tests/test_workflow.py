@@ -65,6 +65,62 @@ class TeamWorkflow(unittest.TestCase):
                                  f"comment inside if block at line {j+1}")
 
 
+class ReadmeDocumentsEveryInput(unittest.TestCase):
+    """⚠️ THE README TABLE IS A SECOND COPY OF THE WORKFLOW'S CONTRACT, so it drifts by default.
+
+    A consumer reads it to decide what to paste. A secret the workflow starts consuming and the
+    table never mentions is a feature nobody knows to enable — and every optional secret here
+    fails *silently*, so nothing else would ever surface the omission.
+
+    Both directions, because each has its own failure: undocumented means a feature nobody
+    switches on, invented means a maintainer hunting for a secret that does nothing.
+    """
+
+    def setUp(self):
+        import re
+        root = pathlib.Path(__file__).resolve().parent.parent
+        self.readme = (root / "README.md").read_text()
+        self.secrets = set(re.findall(r"secrets\.([A-Z_]+)", TEAM)) - {"GITHUB_TOKEN"}
+        self.vars = set(re.findall(r"vars\.([A-Z_]+)", TEAM))
+        self.inputs = set(re.findall(r"^      ([a-z_]+):$", TEAM.split("jobs:")[0], re.M))
+        self.assertIn("## Inputs and secrets", self.readme, "the reference section is gone")
+        self.section = self.readme.split("## Inputs and secrets")[1]
+
+    def test_every_secret_the_workflow_reads_is_documented(self):
+        self.assertTrue(self.secrets)
+        for name in sorted(self.secrets):
+            with self.subTest(secret=name):
+                self.assertTrue(f"`{name}`" in self.readme,
+                                f"{name} is read by team.yml but absent from the README table")
+
+    def test_every_repository_variable_is_documented(self):
+        self.assertTrue(self.vars)
+        for name in sorted(self.vars):
+            with self.subTest(var=name):
+                self.assertTrue(f"`{name}`" in self.readme,
+                                f"{name} is read by team.yml but absent from the README table")
+
+    def test_every_workflow_input_is_documented(self):
+        self.assertTrue(self.inputs)
+        for name in sorted(self.inputs):
+            with self.subTest(input=name):
+                self.assertTrue(f"`{name}`" in self.readme,
+                                f"{name} is a workflow input but absent from the README table")
+
+    def test_the_table_invents_nothing(self):
+        import re
+        known = self.secrets | self.vars | {"GITHUB_TOKEN"}
+        for name in sorted(set(re.findall(r"`([A-Z][A-Z_]{3,})`", self.section))):
+            with self.subTest(named=name):
+                self.assertTrue(name in known,
+                                f"README names {name}, which team.yml never reads")
+
+    def test_onboarding_points_at_the_table_rather_than_restating_it(self):
+        root = pathlib.Path(__file__).resolve().parent.parent
+        onboarding = (root / "ONBOARDING.md").read_text()
+        self.assertIn("Inputs and secrets", onboarding)
+
+
 if __name__ == "__main__":
     unittest.main()
 
