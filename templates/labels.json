@@ -51,7 +51,7 @@
   },
   {
     "name": "spike",
-    "color": "1d76db",
+    "color": "e5399f",
     "description": "A question the work cannot start without \u2014 answered by the Researcher, ships nothing"
   },
   {
@@ -61,12 +61,12 @@
   },
   {
     "name": "story",
-    "color": "0e8a16",
+    "color": "12796b",
     "description": "One shippable outcome, carrying its own branch and the PR that closes it"
   },
   {
     "name": "task",
-    "color": "1d76db",
+    "color": "8bc34a",
     "description": "A slice of a story \u2014 its commits land on the story's branch, and the story owns the PR"
   }
 ]
