@@ -85,5 +85,61 @@ does for any consumer, so a green delegate is not evidence that a prompt change 
 Nothing in this package names a consuming repo, its branches, its gate or its packages — anything
 that does belongs in your overlay.
 
+## Inputs and secrets
+
+Two kinds of configuration: **inputs** written into your stub, and **secrets** the maintainer
+pastes. ⚠️ Only one secret is required. Each of the others buys exactly one feature, and a run
+stays green without them — so a missing optional secret shows up as a feature that quietly does
+not happen, never as a failure.
+
+### Inputs — in your stub
+
+| input | required | where it comes from |
+|---|---|---|
+| `project_owner` | yes | the board's URL — the user or org that owns it |
+| `project_number` | yes | the board's URL, `…/projects/<N>` |
+| `allowed_bots` | no | the dispatch App's login, `<app-slug>[bot]`. Empty admits none |
+| `node` | no | your call — `true` runs `npm ci` before author runs |
+| `browser` | no | your call — `true` installs the Playwright chromium |
+
+⚠️ Name the App in `allowed_bots` **explicitly**. A wildcard lets any external App invoke the
+action with a prompt it controls.
+
+### Secrets — *Settings → Secrets and variables → Actions*
+
+| secret | enables | without it | where to get it |
+|---|---|---|---|
+| **`CLAUDE_CODE_OAUTH_TOKEN`**<br>⚠️ **required** | every model step, all seven roles | every routed run fails env validation in seconds; the whole scripted half still works | `claude setup-token`. Issuing a new one does not revoke tokens other repos hold |
+| `PROJECTS_TOKEN` | board placement and the Status column | a warning; the issue never reaches the board | a **classic** PAT, *Settings → Developer settings → Tokens (classic)*, scopes `project` + `read:org` |
+| `DISPATCH_APP_ID` | the cascade — the next task starts itself | cascade dark; every task labelled by hand | the App's settings page |
+| `DISPATCH_APP_PRIVATE_KEY` | ″ | ″ | generate on that same page; paste the whole `.pem` |
+| `AWS_TRANSCRIPTS_ROLE` | transcript archival to S3 | capture steps skip cleanly | the IAM role's ARN |
+| `AWS_TRANSCRIPTS_BUCKET` | ″ | ″ | the S3 bucket name |
+
+`GITHUB_TOKEN` is ambient and needs no setup. ⚠️ Its deliberate property is that events raised
+with it **start no workflow runs** — one of the three loop guards.
+
+### One repository variable
+
+`AGENT_TRANSCRIPTS` — the *Variables* tab of that same page, and the on/off switch for transcript
+capture.
+
+### ⚠️ Three of these are more than a secret
+
+Pasting the secret and stopping is the commonest install failure, and it is silent.
+
+- **The cascade needs three things**: both `DISPATCH_APP_*` secrets, the App **installed on this
+  repository**, and its login in `allowed_bots`. A missing install shows as a 404 on
+  `get-a-repository-installation-for-the-authenticated-app` — authenticated as the App, not
+  installed here.
+- **Transcript capture needs four**: both AWS secrets, the `AGENT_TRANSCRIPTS` variable, and the
+  IAM role's OIDC trust policy admitting this repo's `sub` claim.
+- **`PROJECTS_TOKEN` cannot be fine-grained.** Those cannot reach user-owned Projects v2 at all,
+  and the failure reads as an unreachable project rather than a bad token.
+
+⚠️ The stub passes `secrets: inherit` and the workflow declares no `secrets:` contract, so every
+repository secret is visible to these jobs. Adding one needs no workflow edit — and the workflow
+cannot narrow what it receives.
+
 See [`CLAUDE.md`](CLAUDE.md) for the design decisions, the platform constraints they work
 around, and the failures that shaped them.

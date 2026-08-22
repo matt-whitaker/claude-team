@@ -111,6 +111,11 @@ Secrets never pass through a session. File an issue on the target listing what t
   role's OIDC trust policy must also admit the new repo's `sub` claim — the secret alone is
   not enough).
 
+⚠️ **Link the README's *Inputs and secrets* table in that issue rather than restating it.** It
+carries what each item buys, what breaks without it, and where to obtain it — and the three that
+need more than a secret pasted. Two copies of this list is how they drift, and the copy a
+maintainer follows is the one that has to be right.
+
 ## 7. The drill — what proves it
 
 After merge and the required secret: file a small **real** issue (a genuine question or task —
