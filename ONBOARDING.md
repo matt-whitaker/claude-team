@@ -8,6 +8,66 @@ the workflow from the default branch.
 
 Private targets are supported (since `v1.1`). Public and private differ in nothing below.
 
+⚠️ **If the target is ALREADY INSTALLED, go to §0 and do not run §1–§7.** They create things that
+exist, and §3 in particular would overwrite an overlay carrying the repo's whole personality.
+
+## 0. Already installed? Upgrade instead
+
+⚠️ **THIS FILE INSTALLED AND NEVER RE-INSTALLED, AND THAT IS HOW A FLEET DRIFTS.** Every step
+below §0 is written for a fresh target. A session pointed at an installed repo had no instruction
+for the case it was actually in, so the consumer half of an upgrade was never stated anywhere and
+"upgrade" meant *bump the ref and hope*.
+
+**Detect the case first.** The target has `.github/workflows/claude.yml` calling this workflow.
+Read its `uses:` ref — that is the installed version. There is no second version number to invent:
+the pin *is* the signal.
+
+```bash
+grep -o 'team\.yml@[^ ]*' <target>/.github/workflows/claude.yml   # installed
+git ls-remote --tags https://github.com/matt-whitaker/claude-team  # available
+```
+
+Then, in order:
+
+1. **Read [`CHANGELOG.md`](CHANGELOG.md) from the installed ref to the current tag.** Every version
+   heading carries an `**Action required:**` line. If they all say `no`, steps 2 and 5 are the
+   whole upgrade.
+
+2. **Bump the `uses:` ref.** It is the only pin a consumer holds — `TEAM_REF` lives inside the
+   workflow and moves with the tag, so a consumer never edits it and must never be told to.
+   ⚠️ A repo that deliberately tracks `@mainline` skips this; see the release note in `CLAUDE.md`
+   for which ones and why.
+
+3. **Reconcile the stub — do not recreate it.** Diff it against
+   [`templates/consumer-stub.yml`](templates/consumer-stub.yml). Everything but the header comment,
+   the `uses:` ref and the `with:` values should be identical, so the diff is a real check rather
+   than noise. **New inputs appear here and nowhere else**: a consumer's stub is frozen, so a new
+   input never arrives on its own — it shows up as a line present in the template and absent in the
+   target.
+
+4. **Leave the overlays alone unless the CHANGELOG says otherwise.** They are the repo's
+   personality and this file has no business rewriting them.
+   ⚠️ **The exception that has already bitten: a base-prompt rule that an overlay now contradicts.**
+   An overlay composes *after* the base, so it **wins** — which means a base change tightening what
+   a role may do reaches nothing if the overlay still grants it. When an entry says a role's scope
+   narrowed, grep the overlays for the old grant.
+
+5. **Re-run everything the pin cannot carry — unconditionally, every time.** It is idempotent and
+   cheap, and this is the half a version number can never express:
+   - **§4's label loop.** ⚠️ Labels live in GitHub, not in the clone, so no ref bump has ever
+     touched them. It is the one step already written to be idempotent and it still drifted,
+     because nothing told anyone to re-run it.
+   - **The board** — is `project_number` still the board this repo's work goes on?
+   - **§6's settings and secrets** — has the CHANGELOG added a required one? *Allow GitHub Actions
+     to create and approve pull requests* is the one that fails late and looks like an engine bug.
+
+6. **Drill again (§7) only if something structural moved** — a new input, a routing change, a
+   changed role set. A pure prose release does not earn a run.
+
+⚠️ **Ship it the same way as an install: branch → PR → merge.** Never push the target's default
+branch, and remember nothing takes effect until merge, because `issues` events always run the
+workflow from the default branch.
+
 ## 1. Decide the four inputs
 
 Settle these before touching files; each is a judgment call about the target, not boilerplate.

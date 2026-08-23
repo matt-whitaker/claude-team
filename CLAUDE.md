@@ -11,12 +11,43 @@ which once silently shadowed a stub), imports the pure text helpers from the *re
 they cannot drift, and runs every git-touching case against real repositories — including
 deliberately stale refs, the condition sandboxes kept lacking.
 
-⚠️ **Releasing**: check out mainline, flip every pin (`TEAM_REF`, the in-workflow `@refs`,
+⚠️ **Releasing**: check out mainline, rename `CHANGELOG.md`'s `## Unreleased` heading to `## vN`
+and open a fresh empty one above it, flip every pin (`TEAM_REF`, the in-workflow `@refs`,
 `load-prompt`'s default, the stub template) from `mainline` to `vN` in one commit, run the suite
 (`ReleasePins` asserts the agreement), tag that commit `vN`, push the tag, and **do not merge the
 release commit** — mainline keeps its canary pins. Consumers pin `@vN`; a repo whose job is to
 exercise the engine tracks `@mainline` instead — brewdocs.beer as the canary, `claude-team-example`
 as the drill target, and this repo's own stub, which `SelfInstall` pins there permanently.
+⚠️ **A RELEASE IS NOT FINISHED WHEN THE TAG IS PUSHED — the consumer half was never written down
+at all.** `ONBOARDING.md` installed and never re-installed: every step was written for a fresh
+target, so a session pointed at an installed repo had no instruction for the case it was in, and
+"upgrade" meant bump the ref and hope. §0 is that path, and `CHANGELOG.md` is what makes it
+answerable.
+⚠️ **THE CHANGELOG IS CONSUMER-FACING OR IT IS WORTHLESS.** A list of merged PRs cannot answer the
+only question a consumer has — *must I act?* — so every version heading carries an explicit
+`**Action required:**` line and a test asserts it. `no` is the commonest answer and the most
+valuable one.
+⚠️ **A file rather than the tag's GitHub release notes**, which was the open question. Three
+reasons, and the third is the deciding one: a session doing an upgrade is already in the clone; a
+release note needs a network call and an API that can drop mid-session; and **a file is testable**,
+which is this package's standard for anything load-bearing. `python3 -m unittest` cannot assert
+anything about a release note.
+⚠️ **The entry is written in the PR that causes it, not at release time.** Reconstructing consumer
+impact from a merge log is exactly the work the file exists to remove, and it is done worst by
+whoever is trying to cut a tag — which is why `## Unreleased` stays permanently open. ⚠️ `v1.1`'s
+entry says *unknown* rather than a summary written backwards; 24 commits separate it from the next
+entry and inferring their impact after the fact is the guesswork this replaces.
+⚠️ **AND A PIN CANNOT EXPRESS REPO STATE, which is the half no version number reaches.** Labels
+live in GitHub, not in the clone — so no ref bump has ever touched them, and this repo's own
+`story` and `task` sat identical at `0E8A16` with empty descriptions while `templates/labels.json`
+said otherwise. The one step already written to be idempotent is the one that drifted, because
+nothing told anyone to re-run it. §0 re-runs it unconditionally, along with the board and the
+Actions settings.
+⚠️ **An overlay that contradicts a tightened base rule is the other thing a bump cannot fix.** An
+overlay composes *after* the base and therefore **wins**, so a base change narrowing what a role
+may do reaches nothing while the overlay still grants it. Measured: the Writer's scope was
+corrected here and two consumer overlays went on granting it. §0 says to grep for the old grant
+whenever an entry reports a narrowed scope.
 ⚠️ **brewdocs.beer-kb tracks `@mainline` without that justification** — it ships product, so the rule
 says pin it. Kept on the edge by the maintainer's call, provisionally.
 
