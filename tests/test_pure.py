@@ -181,5 +181,68 @@ class TheArchitectPromptNamesTheAsIsStory(unittest.TestCase):
         self.assertIn("In doubt, divide", self.prompt)
 
 
+class TheWriterDoesNotOwnTheAgentInstructions(unittest.TestCase):
+    """⚠️ THE WRITER WAS TOLD IT OWNED EVERY `CLAUDE.md` AND THE AGENT INSTRUCTION FILES, and
+    that was a maintainer's decision, since reversed.
+
+    Those files are the instructions the roles run on — the Writer's own among them. A role that
+    edits them rewrites its own operating rules and its peers', inside a story PR being reviewed
+    for something else entirely, so the change that governs every future run arrives as the
+    least-examined part of the diff. Ordinary documentation is checked by whether it reads true;
+    an instruction change is only checked by what it makes agents do next time, which nobody sees
+    until it has already happened.
+
+    ⚠️ Pinned in BOTH files it was written into. Correcting the prompt and leaving the workflow's
+    job header saying the opposite is how the claim comes back — the comment is what the next
+    person editing that job reads."""
+
+    def setUp(self):
+        root = pathlib.Path(__file__).resolve().parent.parent
+        self.writer = (root / "prompts/writer.md").read_text()
+        self.team = (root / ".github/workflows/team.yml").read_text()
+
+    def test_the_prompt_no_longer_grants_them(self):
+        for claim in (
+            "You also own the repo's `CLAUDE.md` files",
+            "own the repo's `CLAUDE.md`",
+        ):
+            self.assertNotIn(claim, self.writer)
+
+    def test_the_prompt_names_them_out_of_scope(self):
+        for path in ("`CLAUDE.md`", "`AGENTS.md`", "`.claude/`", "`.claude-team/`"):
+            with self.subTest(path=path):
+                self.assertIn(path, self.writer)
+        self.assertIn("out of scope", self.writer)
+
+    def test_the_prohibition_admits_no_exception(self):
+        """⚠️ An issue body cannot grant it. A rule with a plausible-sounding escape is one a
+        story will find — this package has already paid for a role obeying a stale worked
+        example over a standing rule."""
+        self.assertIn("an\nissue body cannot grant it", self.writer)
+
+    def test_the_writer_is_told_what_to_do_instead(self):
+        """A prohibition with no outlet turns a real finding into silence. The 🔔 Maintainer
+        section is where a stale instruction is worth more than an unreviewed edit."""
+        self.assertIn("🔔 Maintainer", self.writer)
+
+    def test_the_workflow_comment_agrees_with_the_prompt(self):
+        self.assertNotIn(
+            "Owns documentation: every CLAUDE.md, the agent instruction files", self.team)
+        self.assertIn("IT DOES NOT OWN THE AGENT INSTRUCTIONS", self.team)
+
+    def test_no_other_base_prompt_claims_them(self):
+        """The grant must not simply move. Only the Writer ever had it; if another role's prompt
+        starts naming CLAUDE.md as something it owns, this is where that surfaces."""
+        root = pathlib.Path(__file__).resolve().parent.parent
+        for prompt in sorted((root / "prompts").glob("*.md")):
+            if prompt.name == "writer.md":
+                continue
+            with self.subTest(prompt=prompt.name):
+                text = prompt.read_text()
+                for claim in ("own the repo's `CLAUDE.md`", "own every `CLAUDE.md`",
+                              "you own `CLAUDE.md`"):
+                    self.assertNotIn(claim, text)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1584,13 +1584,24 @@ jobs:
             --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Writer ──
-      # The tech writer. Owns documentation: every CLAUDE.md, the agent instruction files
-      # under .claude/skills, and anything else whose job is to explain rather than run.
+      # The tech writer. Owns the product specification and the HUMAN-facing documentation —
+      # README, guides, reference pages: anything whose reader is a person.
+      #
+      # ⚠️ IT DOES NOT OWN THE AGENT INSTRUCTIONS, AND THIS COMMENT USED TO SAY IT DID —
+      # "every CLAUDE.md, the agent instruction files under .claude/skills". That was a
+      # maintainer's decision, and it was reversed: those files are the instructions the roles
+      # run on, the Writer's own among them. A role editing them rewrites its own operating
+      # rules and its peers', inside a story PR being reviewed for something else — so the
+      # change governing every future run arrives as the least-examined part of the diff.
+      # Ordinary docs are checked by whether they read true; an instruction change is only
+      # checked by what it makes agents do next time, which nobody sees until it has happened.
+      # The Writer reports them in its 🔔 Maintainer section instead.
       #
       # ⚠️ Split out because CLAUDE.md was the single biggest source of merge conflicts —
       # every role edited it, so two branches touching the same package collided on prose
-      # neither was really working on. Implementor and Tester report what needs documenting
-      # and change no docs themselves.
+      # neither was really working on. That reason survives the change above: nobody edits
+      # them now rather than one role doing so. Implementor and Tester still report what
+      # needs documenting and change no docs themselves.
       - name: Stamp the Writer label
         if: contains(steps.roles.outputs.list, 'writer')
         env:
