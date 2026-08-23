@@ -30,8 +30,19 @@ hooks around them, and the handoff contract between them. Consumed by pointing a
 these files; extended by a per-role overlay in the consuming repo.
 **Where.** `prompts/_shared.md` + `prompts/<role>.md`, `hooks/*.py`, `schemas/handoff.json`.
 **Invariants.** Nothing here names a consuming repo, its branches, its gate or its packages.
-Routing is a script first: state decides wherever state can, and a model is consulted only where it cannot — a bare mention that could be a question or a request, a stamp that is missing — with the script's own answer as the floor when the consultation fails. Every hook is deterministic and derives its input from
+**[E1]** Routing is a script first: state decides wherever state can, and a model is consulted only where it cannot — a bare mention that could be a question or a request, a stamp that is missing — with the script's own answer as the floor when the consultation fails. Every hook is deterministic and derives its input from
 state, not from something a model was asked to leave behind.
+
+⚠️ **`RULES.md` names the rules these paragraphs are instances of.** This file is the record —
+what went wrong, measured, and what was done about it. That one is the short list the record keeps
+re-deriving: the dead channel found six times, the guard direction, the proxy measurement, the two
+absolutes a run can only obey by disobeying one. It also carries the conventions for writing a ⚠️
+paragraph at all.
+- A paragraph cites its rule by opening with the id — `⚠️ [E4] **…**`. **Tag as you go**: a
+  paragraph picks one up when someone next edits it, and an untagged paragraph is not a defect.
+- A **new** ⚠️ paragraph cites a rule, or says plainly that it is a new one and adds it there in the
+  same commit.
+- `RuleIds` in `tests/test_rules.py` fails on a citation that resolves to nothing.
 
 ⚠️ **A cloud session should read `CLAUDE_CLOUD.md` first** — what a local session gets from
 memory and `~/.claude/`, which do not reach a cloud container at all. It is mentioned in backticks
@@ -145,7 +156,7 @@ must be stated where it can be seen:
     **nothing** did not, so the loud signal went to the smaller problem. Both callers now say so,
     and the fallback to derived order is deliberately kept — falling back is right, doing it in
     silence is what cost the diagnosis.
-  - ⚠️ **THE ROOT CAUSE WAS THE ARCHITECT PROMPT'S OWN WORKED EXAMPLE.** It demonstrated
+  - ⚠️ [E14] **THE ROOT CAUSE WAS THE ARCHITECT PROMPT'S OWN WORKED EXAMPLE.** It demonstrated
     `**Sequencing.** Its tasks run in order: #606, then #607, then #608.` — which matches the
     heading, puts its refs on the heading line, and parses to zero waves. Two sibling stories
     shipped that form with roles instead of numbers and both ran on derived order. The parser was
@@ -266,7 +277,7 @@ announced *"could not land 1 commit(s)"* and a merge conflict against a ref from
 ⚠️ **A stale-but-ancestor ref is NOT itself a problem** — checked against real repos: the push
 fast-forwards. Staleness only ever surfaced through the wrong measurement.
 
-⚠️ **A FAILED LANDING MUST NOT NAME THE RUNNER'S BRANCH AS SAFE.** It said *"The commits are safe on
+⚠️ [E10] **A FAILED LANDING MUST NOT NAME THE RUNNER'S BRANCH AS SAFE.** It said *"The commits are safe on
 `<runner branch>`"* — a ref that is never pushed and dies with the container. Nothing was safe
 there. ⚠️ The same defect in the capture: it pushed unconditionally and wrote *"your changes are
 preserved on `failure/…`"* even when that ref was byte-identical to the default branch, handing the
@@ -276,7 +287,7 @@ incident here was caught precisely because something looked wrong. ⚠️ The ca
 when ahead-ness cannot be determined it pushes anyway, because an empty branch is noise and a lost
 capture is the thing the hook exists to prevent.
 
-⚠️ **AND A SUCCESSFUL LANDING SAID IT TOO, WHICH IS WORSE.** `finish-pr.py` finds no PR for the
+⚠️ [E7] **AND A SUCCESSFUL LANDING SAID IT TOO, WHICH IS WORSE.** `finish-pr.py` finds no PR for the
 run's branch — correct, the story's PR is `open-story-pr.py`'s to open — and then asks whether the
 run produced commits by counting `origin/<default>..HEAD`. `work-completion.py` has already pushed
 those commits onto the story branch and **the runner's branch still carries them**, so that count
@@ -327,7 +338,7 @@ checks the PR's state, and for an **open** PR it checks out `headRefName` and **
 for an issue trigger or a closed/merged PR. So a follow-up run is put on the right branch before
 the model gets a turn.
 
-⚠️ **The contradiction that produced the extra PRs was ours.** The prompt told every run to "open
+⚠️ [E13] **The contradiction that produced the extra PRs was ours.** The prompt told every run to "open
 your PR against the story branch" and, in the same breath, "never commit to the story branch
 itself". On a comment against the *story's own PR*, the checkout puts the run on the story branch —
 so both instructions were wrong at once, and a run obeying them had to invent a third branch and a
@@ -541,7 +552,7 @@ alone leaves no way to say "the issue does not tell me", so a model obliged to p
 exactly the confident-wrong route this is meant to remove — and worse than the script's, because
 answering suppresses the guess notice that would have flagged it.
 
-⚠️ **`kind` IS RESOLVED FOR EVERY ISSUE TRIGGER, AND FOR A LONG TIME IT WAS SET ON ONE PATH ONLY.**
+⚠️ [E9] **`kind` IS RESOLVED FOR EVERY ISSUE TRIGGER, AND FOR A LONG TIME IT WAS SET ON ONE PATH ONLY.**
 Rule 3 — the unshaped-issue path — computed it; rules 1, 2 and 4 emitted empty, which prints as
 `n/a`. Nothing read it, so nothing broke, until a workflow guard did: the Architect's dispatch step
 tested `kind != 'epic'`, and `'n/a' != 'epic'` is **true**. Measured on #1112 — a maintainer's
@@ -622,7 +633,7 @@ The root role is the only one that may put **process state** right — the break
 which is exactly why it accumulates: an issue off the board, a child never parented, a missing
 classification label.
 
-⚠️ **It names repairs; a hook applies them.** The model returns JSON, `apply-repairs.py` acts on it,
+⚠️ [E3] **It names repairs; a hook applies them.** The model returns JSON, `apply-repairs.py` acts on it,
 and the hook's repertoire is a fixed enum — `board-item`, `sub-issue-link`, `classification-label`.
 That is what makes "never touches content" a fact about what *exists* rather than a promise in a
 prompt, which was the acceptance criterion: enforced by what the role can **reach**.
@@ -642,7 +653,7 @@ but has nothing of its own to commit; `github_token` is passed, so the job's `pe
 is what its token actually gets; and every run's transcript is captured, which is the audit for
 the bound that is now instructed rather than enforced.
 
-⚠️ **Fix AND report, never fix quietly**, and this is the rule most likely to be eroded by a
+⚠️ [E12] **Fix AND report, never fix quietly**, and this is the rule most likely to be eroded by a
 well-meaning change. Every repair appends to one log comment on its target carrying *what was
 wrong* and *why*. The value of this system has come from breakage being visible: a 404 nobody hid
 is what produced the rule that prevents it, and a custodian that had silently created the branch
@@ -659,7 +670,7 @@ needing content changed, and anything whose real fix is upstream in a rule goes 
 would fix it. Keeping it separate from `repairs` is the point: a custodian that quietly fixed
 everything would erase the evidence that the rule is wrong.
 
-⚠️ **AND IT HAS TO REACH THE ISSUE, WHICH FOR A LONG TIME IT DID NOT.** `apply-repairs.py` posted
+⚠️ [E4] **AND IT HAS TO REACH THE ISSUE, WHICH FOR A LONG TIME IT DID NOT.** `apply-repairs.py` posted
 `repairs` as a comment and `print`ed `unrepairable` to the job log — so the half that carries the
 weight reached nobody. That is the **fifth** instance of this exact shape here, after `DEFAULTED`,
 the author handoff appended in a job its readers never run in, `decisions` on the PR path, and
@@ -938,7 +949,7 @@ yet.
   Maintainer heads-ups that nobody picked up. **A PR comment is not a durable artifact.** The
   issue, the spec and the code are, and a decision reached in review lands in none of them
   unless something puts it there.
-- ⚠️ **The decisions log APPENDS; every other hook comment upserts.** That difference is
+- ⚠️ [E6] **The decisions log APPENDS; every other hook comment upserts.** That difference is
   deliberate, not an inconsistency. A status board or a handoff is *derived* — regenerated whole
   each run, so replacing it loses nothing. A decision is a **record**: a PR draws several rounds
   of review, and round two replacing round one destroys the fact the comment exists to keep. It
@@ -951,7 +962,7 @@ yet.
   forces delivery. Neither is a model instruction. Asking a model to leave a
   machine-readable block for a later role is the version that fails.
 - A candidate is a proposal, never an order. Rejecting all of them is a correct outcome.
-- ⚠️ **Three states, not two.** Entries mean the author found something; `[]` means it looked
+- ⚠️ [E5] **Three states, not two.** Entries mean the author found something; `[]` means it looked
   and found nothing; **no handoff comment at all** means no author ran, or its run failed
   before posting. A consumer that collapses the last two will treat a failed run as a clean
   one.
@@ -993,7 +1004,7 @@ from a true observation.** Re-triggering works because the failure is **nondeter
 depends on whether the model reaches for the background tool at all. That is a coin flip, and
 reading it as "nothing was wrong" is what kept the real mechanism hidden across three runs.
 
-⚠️ **The fix is the prompt, and it has to be specific, because the general rule did not bind.**
+⚠️ [E16] **The fix is the prompt, and it has to be specific, because the general rule did not bind.**
 "Never end a run with an intention" was already there and the model did not think it was ending on
 one — it believed it had *scheduled a resumption*, and the tool call had returned success. The rule
 therefore names the behaviour (backgrounding) rather than the feeling (giving up), and it must
@@ -1023,7 +1034,7 @@ An issue that removes a role's permission to stop converts a cheap, informative 
 expensive, opaque one — measured across five runs on one story, where the first three reported
 precisely what blocked them in 1–4 minutes and the last two ground to the cap with nothing.
 
-⚠️ **AND THE THIRD SHAPE IS GATHERING WITHOUT PRODUCING, which neither of the other two catches.**
+⚠️ [E15] **AND THE THIRD SHAPE IS GATHERING WITHOUT PRODUCING, which neither of the other two catches.**
 Stopping early is a plan with unticked boxes; stopping late is grinding on one obstacle. This is
 neither: every turn succeeds, every turn yields something genuinely new, and the deliverable is
 still empty when the budget ends. Measured on #746 — **17 driver scripts, 20 screenshots, 81 turns,
@@ -1043,7 +1054,7 @@ planned its own failure — nobody is reading while a run executes. The prompt s
 a stop condition: choose a defensible reading, ship, and raise the question in the 🔔 Maintainer
 section.
 
-⚠️ **The prompt is the second line of defence, not the first.** The custodial phase fails the run
+⚠️ [E17] **The prompt is the second line of defence, not the first.** The custodial phase fails the run
 when the deliverable is missing, because for as long as this went unnoticed it reported success.
 Neither replaces the other: the check is how anyone finds out, the prompt is what stops it.
 
@@ -1052,7 +1063,7 @@ host action's own prompt, which for comment events states repeatedly that the mo
 instructions are the triggering comment. Ours arrives after all of that, so the override has
 to be the first thing in it.
 
-⚠️ **Keep the split honest.** A rule that would be true in any repo belongs in the base; a
+⚠️ [E18] **Keep the split honest.** A rule that would be true in any repo belongs in the base; a
 rule that names a command, a path or a package belongs in the overlay.
 
 ⚠️ **`trigger_phrase` must be the role's exact handle.** It gates nothing when a prompt is
@@ -1151,7 +1162,7 @@ turns and cannot be forgotten.
   close with nothing to signal it. ⚠️ **Unless the author reported `remaining`** — then the hook
   withholds the keyword rather than adding it. A forgotten keyword and a deliberately omitted one
   were indistinguishable, and the deliberate one lost.
-- ⚠️ **`open-story-pr.py` calls `gh pr create`, so its job needs `pull-requests: write`** — and
+- ⚠️ [E8] **`open-story-pr.py` calls `gh pr create`, so its job needs `pull-requests: write`** — and
   until that was noticed it had `read`, so the call 403'd **every time since the hook existed**.
   It had never once succeeded: every story PR in the consuming repo was opened by hand, while this
   file described the hook as the mechanism. A story branch then sat unmerged with nobody looking
@@ -1223,7 +1234,7 @@ turns and cannot be forgotten.
 ⚠️ **Two scripted phases, one at each end of a run**: `delegate` routes in front, `custodial`
 checks behind, and both consult a model only where a script cannot decide.
 
-⚠️ **The back half exists because the front half cannot answer its questions.** "Does this story
+⚠️ [E19] **The back half exists because the front half cannot answer its questions.** "Does this story
 have tasks?" read 0 for *every* story at branch-creation time while creation ran before
 `file-sub-issues.py` — dissolved by moving the Architect's `branch-navigation.py` call after it. "Was this branch ever used?" is not knowable until work lands, or does
 not. "Did the Architect deliver?" is only knowable once it has stopped. Each of these was attempted
@@ -1296,12 +1307,12 @@ log is not reporting, and a branch that vanishes with no record is indistinguish
 was never created. ⚠️ Only a **deletion** writes; every no-op path stays silent, or the log becomes
 noise nobody reads.
 
-⚠️ **The branch delete is safe by construction, not by care.** Two conditions, both required:
+⚠️ [E11] **The branch delete is safe by construction, not by care.** Two conditions, both required:
 0 commits ahead of the default branch — so there is no content to lose — **and** the issue closed,
 so nothing is about to arrive. Either alone is wrong: 0-ahead by itself would delete a story branch
 whose first task has not run yet.
 
-⚠️ **A scripted hook fed by model-written input is still model-driven.** Derive a hook's
+⚠️ [E2] **A scripted hook fed by model-written input is still model-driven.** Derive a hook's
 input from something the model must produce for another reason, or from state it cannot
 avoid creating — never from a block it was merely asked to leave behind.
 
