@@ -35,6 +35,12 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 - **The Architect prompt now names the as-is story** — a story left whole, carrying its own
   `Branch:` line and a `Role:` stamp. No consumer action; it is the shaping side of a path routing
   already supported. Expect fewer unnecessary Writer tasks on small stories.
+- **⚠️ A role step that succeeds but returns no handoff now FAILS the run.** It used to print
+  *"no author ran, or its step failed"* — both halves false in that case — and report success while
+  the task stayed open and the story halted. No action, but **expect a previously-green failure
+  mode to start showing red**: that is the run telling you a task did not close. Re-trigger it.
+  The transcript is also captured for that one case regardless of `AGENT_TRANSCRIPTS`, because why
+  the step produced nothing is unknowable from anything else the run keeps.
 - **⚠️ Three base author prompts stopped contradicting the shared rule.** `implementor.md`,
   `designer.md` and `tester.md` still described the removed per-task-PR model — *"cut your own
   branch off the story's, and open your own PR into it"* — against `_shared.md`'s *"A TASK HAS NO
