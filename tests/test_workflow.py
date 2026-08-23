@@ -1,3 +1,4 @@
+import os
 import pathlib
 import re
 import unittest
@@ -164,6 +165,186 @@ class ReadmeDocumentsEveryInput(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TheConsumerNamesItsOwnToolchain(unittest.TestCase):
+    """⚠️ #46: every authoring role was granted `Bash(npm|npx|node:*)` and nothing else, so an
+    author in a Python-gated repo could not run the gate — including in THIS repo, whose gate is
+    `python3 -m unittest`. Measured on run 32561656056: the Implementor reimplemented its
+    assertion in `node` and reported that it had not run the Python suite. That is the ceiling of
+    the constraint — a role producing a change it cannot verify.
+
+    It also broke the package's own invariant: *nothing here names a consuming repo, its branches,
+    its gate or its packages.* A toolchain is the same category as a gate."""
+
+    # ⚠️ AN AUTHORING STEP IS ONE THAT CARRIES THE HANDOFF SCHEMA, not one whose tool string
+    # happens to start `Edit,Write`. Matching on the shape of the string caught the ARCHITECT,
+    # which holds `Read,Edit,Write` to rewrite an issue body and correctly has no runtime — it
+    # writes no code and runs no gate. `--json-schema` is exactly the four roles that do.
+    @staticmethod
+    def _claude_args_blocks(text):
+        """Each `claude_args: |` body, taken to the first line that dedents out of it.
+        ⚠️ Deliberately NOT one regex: `\\s{12}` matches newlines, so a greedy version ran past
+        the end of a step and swept the next role's flags into the same block."""
+        blocks = []
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            if line.strip() != "claude_args: |":
+                continue
+            body = []
+            for nxt in lines[i + 1:]:
+                if nxt.strip() and not nxt.startswith(" " * 12):
+                    break
+                body.append(nxt)
+            blocks.append("\n".join(body))
+        return blocks
+
+    # ⚠️ AN AUTHORING ROLE IS ONE THAT RUNS IN THE `authors` JOB. Two narrower-looking
+    # discriminators were tried and both were wrong: matching `Edit,Write` swept in the
+    # ARCHITECT, which rewrites issue bodies and runs no gate; matching `--json-schema` swept in
+    # the CUSTODIAN and the RESEARCHER, which also return JSON. The job boundary is the thing
+    # that actually means "writes code, needs the consumer's gate".
+    @staticmethod
+    def _job(text, name):
+        """One job's lines, from its key to the next key at the same indent.
+        ⚠️ Line-walked rather than regexed — a lookahead for the NEXT job assumed a blank line
+        before it and silently matched nothing when there wasn't one."""
+        lines, out, inside = text.splitlines(), [], False
+        for line in lines:
+            if line == f"  {name}:":
+                inside = True
+                continue
+            if inside and re.match(r"^  \S.*:$", line):
+                break
+            if inside:
+                out.append(line)
+        assert out, f"job {name} not found"
+        return "\n".join(out)
+
+    AUTHORS_JOB = _job.__func__(TEAM, "authors")
+
+    AUTHOR_TOOLS = [
+        re.search(r'--allowedTools "([^"]*)"', b).group(1)
+        for b in _claude_args_blocks.__func__(AUTHORS_JOB)
+        if "--allowedTools" in b
+    ]
+
+    def test_all_four_authoring_roles_are_found(self):
+        """Guards the extraction above: if it stops matching, every assertion below passes
+        vacuously — and a test that cannot fail is worse than no test."""
+        self.assertEqual(len(self.AUTHOR_TOOLS), 4, self.AUTHOR_TOOLS)
+
+    def test_the_architect_is_not_swept_in(self):
+        """It rewrites issue bodies, so it holds `Read,Edit,Write` and looks like an author to
+        anything matching on that. It runs no gate and must gain no runtime."""
+        self.assertIn('--allowedTools "Read,Edit,Write,Bash(gh:*),Bash(git:*)"', TEAM)
+
+    def test_no_author_allowlist_hard_codes_a_toolchain(self):
+        for tools in self.AUTHOR_TOOLS:
+            with self.subTest(tools=tools):
+                for named in ("npm", "npx", "node", "python", "go:", "cargo", "bundle"):
+                    self.assertNotIn(named, tools,
+                                     f"{named} is a consumer's toolchain; it belongs in `runtimes`")
+
+    def test_every_author_takes_the_resolved_grant(self):
+        for tools in self.AUTHOR_TOOLS:
+            with self.subTest(tools=tools):
+                self.assertIn("${{ steps.runtimes.outputs.grants }}", tools)
+
+    def test_the_authors_still_hold_git_and_gh_unconditionally(self):
+        """`runtimes` widens the gate, it does not replace what an author has always needed:
+        the landing hooks are not the only thing that touches git, and `gh` is how a role reads
+        its own issue."""
+        for tools in self.AUTHOR_TOOLS:
+            with self.subTest(tools=tools):
+                self.assertIn("Bash(git:*)", tools)
+                self.assertIn("Bash(gh:*)", tools)
+
+    def test_the_default_reproduces_the_old_fixed_list(self):
+        """⚠️ A consumer upgrading past this change must see no behaviour difference. The old
+        grant was npm, npx and node; the default has to be exactly that, or the release breaks
+        every existing install."""
+        self.assertRegex(TEAM, r'runtimes:\n\s+description:[\s\S]*?default: "npm,npx,node"')
+
+    def test_the_stub_and_the_self_install_both_declare_it(self):
+        self.assertIn("runtimes:", STUB)
+        self.assertIn('runtimes: "python3"', SELF,
+                      "this repo's gate is python3 — it is the case #46 was found on")
+
+    def test_the_narrow_role_allowlists_are_untouched(self):
+        """The Researcher holds no shell BY DESIGN, and the Custodian and Security are
+        allowlisted by subcommand. `runtimes` is for the authoring roles only — widening any of
+        these three would undo a deliberate bound."""
+        self.assertIn('--allowedTools "Read,WebSearch,WebFetch"', TEAM)
+        for narrow in ("Bash(gh issue view:*)", "Bash(gh pr diff:*)"):
+            self.assertIn(narrow, TEAM)
+        self.assertNotIn('Read,WebSearch,WebFetch${{', TEAM)
+
+
+class TheRuntimesResolverActuallyRuns(unittest.TestCase):
+    """⚠️ PINNING THE YAML PROVES THE WIRING, NOT THE BEHAVIOUR. The resolver is a shell script
+    that sanitises consumer-supplied text before it lands inside a quoted `--allowedTools` string
+    the action parses line by line. A bad entry must fail the step, not silently rewrite the flags
+    after it — so the script itself is extracted and executed here."""
+
+    def script(self):
+        """The `run:` body of the `id: runtimes` step, dedented."""
+        block = re.search(
+            r"- id: runtimes\n(?:.*\n)*?        run: \|\n((?:          .*\n|\n)+)", TEAM)
+        self.assertIsNotNone(block, "could not find the runtimes step's run: body")
+        return "".join(l[10:] if l.startswith(" " * 10) else l
+                       for l in block.group(1).splitlines(keepends=True))
+
+    def resolve(self, value):
+        import subprocess
+        return subprocess.run(
+            ["bash", "-c", self.script()],
+            capture_output=True, text=True,
+            env={**os.environ, "RUNTIMES": value, "GITHUB_OUTPUT": self.out},
+        )
+
+    def setUp(self):
+        import tempfile
+        fd, self.out = tempfile.mkstemp()
+        os.close(fd)
+        self.addCleanup(os.unlink, self.out)
+
+    def grants(self, value):
+        r = self.resolve(value)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        written = open(self.out).read()
+        return dict(l.split("=", 1) for l in written.splitlines() if "=" in l)["grants"]
+
+    def test_the_default_expands_to_the_old_fixed_list(self):
+        self.assertEqual(self.grants("npm,npx,node"),
+                         ",Bash(npm:*),Bash(npx:*),Bash(node:*)")
+
+    def test_a_single_runtime_works(self):
+        self.assertEqual(self.grants("python3"), ",Bash(python3:*)")
+
+    def test_surrounding_whitespace_is_tolerated(self):
+        self.assertEqual(self.grants(" python3 , go "), ",Bash(python3:*),Bash(go:*)")
+
+    def test_an_empty_entry_is_skipped_rather_than_expanded(self):
+        self.assertEqual(self.grants("python3,,go"), ",Bash(python3:*),Bash(go:*)")
+
+    def test_an_entry_that_could_rewrite_the_flags_fails_the_step(self):
+        """The value sits inside `--allowedTools "…"`. A quote, or anything that reaches the
+        parser as a new argument, could widen the grant far past what the consumer wrote."""
+        for hostile in ['node:*)",Bash', "node'", 'node"', "node;rm -rf /", "Bash(node:*)"]:
+            with self.subTest(entry=hostile):
+                r = self.resolve(hostile)
+                self.assertNotEqual(r.returncode, 0, f"{hostile!r} was accepted")
+                self.assertIn("::error::", r.stdout + r.stderr)
+
+    def test_resolving_to_nothing_fails_rather_than_granting_nothing(self):
+        """⚠️ An author with no runtime cannot run any gate. Failing loudly beats a run that
+        silently cannot verify anything — that silence is the whole of #46."""
+        for empty in ("", "  ", ",,,"):
+            with self.subTest(value=repr(empty)):
+                r = self.resolve(empty)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("::error::", r.stdout + r.stderr)
 
 
 class ReleasePins(unittest.TestCase):

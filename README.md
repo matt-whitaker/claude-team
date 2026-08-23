@@ -101,9 +101,15 @@ not happen, never as a failure.
 | `allowed_bots` | no | the dispatch App's login, `<app-slug>[bot]`. Empty admits none |
 | `node` | no | your call — `true` runs `npm ci` before author runs |
 | `browser` | no | your call — `true` installs the Playwright chromium |
+| `runtimes` | no | **your repo's gate** — the commands an author must be able to run. Defaults to `npm,npx,node` |
 
 ⚠️ Name the App in `allowed_bots` **explicitly**. A wildcard lets any external App invoke the
 action with a prompt it controls.
+
+⚠️ Set `runtimes` to whatever your gate actually needs — `python3` for a Python repo, `go`, `cargo`,
+`bundle`, and so on. Each entry becomes a `Bash(<name>:*)` grant for the four authoring roles, and
+they hold no other runtime. An author that cannot run your gate still produces the change; it just
+cannot verify it, and says so in its report rather than failing — which is easy to miss.
 
 ### Secrets — *Settings → Secrets and variables → Actions*
 

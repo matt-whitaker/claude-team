@@ -719,6 +719,40 @@ starting the app and driving it, not reading the source. Withholding `npm`/`npx`
 made the one role that owns the spec unable to produce it, and it failed the expensive way — by
 burning turns on permission denials rather than saying so.
 
+⚠️ **AND THE SHELL THEY DO HOLD IS THE CONSUMER'S TO NAME, WHICH THIS FILE USED TO DO ITSELF.**
+Every authoring role was granted `Bash(npm|npx|node:*)` and nothing else, so an author in a
+Python-gated repo could not run the gate at all — **including in this repo**, whose own gate is
+`python3 -m unittest`. It is a straight violation of the invariant at the top: *nothing here names
+a consuming repo, its branches, its gate or its packages.* A toolchain is the same category as a
+gate.
+⚠️ **The symptom is a role that produces a change it cannot verify**, and reports that in a
+section easy to skip. Measured on run 32561656056: the Implementor reimplemented its assertion in
+`node` against the real data and said plainly, in its 🔔 Maintainer block, that this was not the
+Python suite running (#46). It is milder here, where a maintainer reads the handoff, than in a
+consumer where nobody does before merging. ⚠️ It silently changes what the **Tester** means too —
+a Tester that cannot execute the suite it just wrote is asserting that its tests *should* pass,
+which is the derive-from-the-implementation failure wearing a different hat.
+⚠️ **A `runtimes` input replaces it**, defaulting to `npm,npx,node` so no existing consumer
+changes behaviour, each entry expanded into a `Bash(<name>:*)` grant by a step in the authors job.
+⚠️ **The value is SANITISED, not interpolated raw** — it lands inside the quoted `--allowedTools`
+string, which the action parses line by line, so an entry carrying a quote could rewrite the flags
+after it. A consumer already controls its own caller workflow, so this is not a privilege boundary;
+it is what stops a typo widening the grant instead of failing. ⚠️ **Resolving to nothing fails the
+step**, because an author with no runtime cannot run any gate and the silence is the whole defect.
+⚠️ **`Bash(*)` was never available as the fix.** The Researcher's own history records that a broad
+grant shipped briefly and was a live token-exfiltration path: the action re-injects `GH_TOKEN` and
+`CLAUDE_CODE_OAUTH_TOKEN` into the agent's environment whatever the step declares.
+⚠️ **The four authors now share ONE grant, so the Tester gained `node`** — a stated widening, not
+a side-effect. It held `npm`/`npx` and not `node` with nothing anywhere saying why, and `npx`
+already executes node code, so the omission bounded nothing. Per-role runtime lists were the
+alternative and would make a Python consumer configure four of them.
+⚠️ **The narrow roles are untouched and must stay so**: the Researcher holds no shell by design,
+and the Custodian and Security are allowlisted by subcommand. `runtimes` is for the authoring
+roles alone.
+⚠️ **One toolchain name survives, deliberately unfixed:** Security still holds `Bash(npm audit:*)`.
+That is a dependency-audit capability rather than a gate, so it is a different question — but it is
+the same category of assumption and should be named when someone settles it.
+
 ⚠️ **It is the only role that reads the open web, and the only one whose input the maintainer did
 not write** — which is exactly why **it holds no shell**. No `Bash` of any kind, no `Write`, no
 `npm ci`, no build. It reads (`Read`/`Glob`/`Grep`), it fetches, and it returns JSON.

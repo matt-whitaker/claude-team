@@ -56,4 +56,8 @@ jobs:
       allowed_bots: ""
       node: false
       browser: false
+      # The commands an authoring role may run, so it can execute THIS repo's gate.
+      # Each becomes a `Bash(<name>:*)` grant. A Python repo sets "python3"; a Go repo
+      # "go". Leave the default if your gate is npm-driven.
+      runtimes: "npm,npx,node"
     secrets: inherit
