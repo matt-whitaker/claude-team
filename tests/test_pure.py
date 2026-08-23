@@ -244,5 +244,84 @@ class TheWriterDoesNotOwnTheAgentInstructions(unittest.TestCase):
                     self.assertNotIn(claim, text)
 
 
+class NoBasePromptTellsATaskToOpenAPR(unittest.TestCase):
+    """⚠️ #19: THREE ROLE PROMPTS STILL DESCRIBED THE REMOVED PER-TASK-PR MODEL, and contradicted
+    `_shared.md` inside the same composed prompt.
+
+    `_shared.md`: *"A TASK HAS NO PR. THERE IS EXACTLY ONE PR PER STORY, AND IT IS NOT YOURS TO
+    OPEN."* Against `tester.md`/`implementor.md`/`designer.md`: *"Cut your own branch off the
+    story's, and open your own PR into it."* A role obeying its own section over the shared one
+    opens exactly the extra PRs the current model removed — and which instruction wins is the
+    model's call, which is the failure this package keeps paying for.
+
+    ⚠️ #19 ASKED WHETHER "THE BASE PROMPTS AGREE WITH EACH OTHER" IS ASSERTABLE WITHOUT BECOMING
+    BRITTLE, and the answer is no in general and yes here. Agreement over prose is a semantic
+    question no test can hold, and one that tried would need editing on every prompt change. A
+    single NAMED RULE is different: it is short, it is load-bearing, and it has now been
+    contradicted once per role. Assert the rule, not the agreement."""
+
+    AUTHORS = ("implementor", "designer", "tester", "writer")
+
+    def setUp(self):
+        self.root = pathlib.Path(__file__).resolve().parent.parent
+
+    def instructions(self, role):
+        """The prompt with its correction QUOTES removed.
+
+        ⚠️ This package's convention is that a corrected paragraph quotes what it replaced —
+        *"cut your own branch off the story's…"* now appears inside the ⚠️ notice explaining why
+        it is wrong. A naive search for the old wording therefore matches the fix itself and
+        fails forever. Strip `*"…"*` spans first, so what remains is only what the prompt
+        actually instructs."""
+        import re as _re
+        text = (self.root / "prompts" / f"{role}.md").read_text()
+        return _re.sub(r'\*"[^"]*"\*', " [quoted] ", text, flags=_re.S)
+
+    def test_the_strip_actually_removes_the_quoted_correction(self):
+        """Guards the helper: if the regex stops matching, every assertion below passes only
+        because it is reading the correction notice as prose, and the real check is gone."""
+        stripped = self.instructions("implementor")
+        self.assertIn("[quoted]", stripped, "no correction quote was stripped — check the regex")
+        self.assertNotIn("open your own PR into it", stripped)
+
+    def test_no_author_is_told_to_open_its_own_pr(self):
+        for role in self.AUTHORS:
+            text = self.instructions(role)
+            for banned in ("open your own PR", "your task PR", "your own PR into it"):
+                with self.subTest(role=role, phrase=banned):
+                    self.assertNotIn(banned, text)
+
+    def test_no_author_is_told_to_cut_its_own_branch(self):
+        for role in self.AUTHORS:
+            text = self.instructions(role)
+            for banned in ("Cut your own branch", "cut your own branch off",
+                           "merge back into it"):
+                with self.subTest(role=role, phrase=banned):
+                    self.assertNotIn(banned, text)
+
+    def test_the_shared_rule_still_says_what_the_roles_now_agree_with(self):
+        """⚠️ The assertions above are only meaningful while `_shared.md` still carries the rule.
+        If it were softened, they would pass over three prompts agreeing with nothing."""
+        shared = (self.root / "prompts/_shared.md").read_text()
+        self.assertIn("A TASK HAS NO PR", shared)
+        self.assertIn("IT IS NOT YOURS TO OPEN", shared)
+
+    def test_the_three_corrected_prompts_say_what_to_do_instead(self):
+        """A removed instruction with nothing in its place is how a role invents one."""
+        for role in ("implementor", "designer", "tester"):
+            with self.subTest(role=role):
+                text = (self.root / "prompts" / f"{role}.md").read_text()
+                self.assertIn("staging area", text)
+                self.assertIn("edit, report, stop", text.lower())
+
+    def test_the_implementors_git_licence_survives_and_is_bounded(self):
+        """⚠️ It is the one author that may act on the story branch — keeping it current, and
+        resolving a conflicted landing when summoned. Removing the per-task-PR language must not
+        remove that, and must not be read as restoring a branch of its own."""
+        text = (self.root / "prompts/implementor.md").read_text()
+        self.assertIn("keeping the story branch current", text)
+        self.assertNotIn("- Push to the story branch.", text)
+
+
 if __name__ == "__main__":
     unittest.main()

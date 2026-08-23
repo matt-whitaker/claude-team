@@ -9,12 +9,28 @@ across. See _What you own_.
 
 ## Where your work goes
 
-Your task's **Branch** line names its *story's* branch. You cut your own branch off it and
-merge back into it, so your work reaches the story's PR through your own.
+Your task's **Branch** line names its *story's* branch — never a branch of its own. That is
+where the work has to end up, and a hook is what puts it there.
 
-⚠️ **Cut your own branch off the story's, and open your own PR into it** — see _Your
-branch_ above. The story's PR is opened by a scripted hook when your task PR merges; that
-one is not yours to create or to finish.
+⚠️ **YOU ARE ALREADY ON THE RIGHT BRANCH, AND IT IS NOT THAT ONE.** The system that started you
+always cuts a branch; it has no way to put you straight onto the story branch. What you are on is
+a **staging area**: `work-completion.py` commits your changes there and lands them on the story
+branch after you stop. Edit there and leave the git alone.
+
+⚠️ **A TASK HAS NO PR, AND THIS SECTION USED TO SAY IT DID** — *"cut your own branch off the
+story's, and open your own PR into it"*. That was the removed per-task-PR model, and obeying it
+opens exactly the extra PRs the current one exists to prevent. One story is one review; a PR per
+task splits it across several places and makes the maintainer reassemble it.
+
+So: **edit, report, stop.** Do not cut a branch, do not push, do not open a PR, and do not read
+the absence of one as something gone wrong — before the story's last task completes, its absence
+is the design. The story's PR is opened by a hook, from the story's branch, and it is not yours to
+create or to finish.
+
+⚠️ **The one git exception you DO hold is elsewhere**: keeping the story branch current when it
+is stale, and resolving a conflicted landing when the maintainer summons you. That is a licence to
+act on the *story's* branch when asked — not to route your own task's work through a branch of
+your own.
 
 ## What you own
 
@@ -44,7 +60,6 @@ already gets right.
 - ⚠️ **Render controls with the accessible name the spec gives them.** The spec's nouns are the
   selectors: *a button named "Complete Mash"* means a button whose accessible name is exactly
   that, because the Tester queries by it and converges on your work without reading it.
-- Push to the story branch.
 - End your comment with a **Handoff**: what is implemented, what is still open, decisions
   and gotchas discovered, a one-line-per-file map, and how to verify. Keep it a scannable
   status doc — a bloated handoff costs the turns it was meant to save. A **🔔 Maintainer**

@@ -22,11 +22,27 @@ story branch, so a handoff written during the first task would have nowhere to g
 
 ## Where your work goes
 
-The same place the Implementor's did: the story's branch, named on the issue's **Branch**
-line. Your tests land in the story's PR beside the code they cover.
+Your task's **Branch** line names its *story's* branch — never a branch of its own. That is
+where the work has to end up, and a hook is what puts it there.
 
-⚠️ **Cut your own branch off the story's, and open your own PR into it** — see _Your
-branch_ in the shared rules. Your tests land on the story branch when that PR merges.
+⚠️ **YOU ARE ALREADY ON THE RIGHT BRANCH, AND IT IS NOT THAT ONE.** The system that started you
+always cuts a branch; it has no way to put you straight onto the story branch. What you are on is
+a **staging area**: `work-completion.py` commits your changes there and lands them on the story
+branch after you stop. Edit there and leave the git alone.
+
+⚠️ **A TASK HAS NO PR, AND THIS SECTION USED TO SAY IT DID** — *"cut your own branch off the
+story's, and open your own PR into it"*. That was the removed per-task-PR model, and obeying it
+opens exactly the extra PRs the current one exists to prevent. One story is one review; a PR per
+task splits it across several places and makes the maintainer reassemble it.
+
+So: **edit, report, stop.** Do not cut a branch, do not push, do not open a PR, and do not read
+the absence of one as something gone wrong — before the story's last task completes, its absence
+is the design. The story's PR is opened by a hook, from the story's branch, and it is not yours to
+create or to finish.
+
+⚠️ **Your tests land beside the code they cover, in the story's one PR** — which is the point of
+running last. A reviewer reads the feature and its coverage as a single diff, and a separate test
+PR is exactly what would take that away.
 
 ## Driving the app
 
