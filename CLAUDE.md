@@ -1151,7 +1151,7 @@ forgotten by a model that ran out of turns or simply skipped it.
 | `post-handoff.py` | post, authors | posts the JSON handoff to the story's issue, and appends its `decisions` to one running log there |
 | `log-to-story.py` | post, Architect + authors + on merge | rewrites one comment on the story listing its tasks in trigger order |
 | `log-to-epic.py` | post, authors | rewrites one rolling work-log comment on the epic |
-| `open-story-pr.py` | **on merge** | opens the story's PR once a task has landed on its branch |
+| `open-story-pr.py` | after a landing, **on merge**, and **when a task is closed by hand** | opens the story's PR once every task is closed. ⚠️ Its reachability used to be a function of *how* a task was closed: both call sites were events the machinery produces, so a human close stranded the story with no gesture that resumes it (#31). The `issues: closed` path passes `ISSUE` instead of `BASE` and resolves the story from the closed task's own Branch line |
 | `close-merged-work.py` | on merge | closes the PR's issues and files them on the board |
 | `custodial-sweep.py` | **post, every role** (`deliverable`) and **on merge** (`branches`) | checks what a run left behind: an Architect with no `Branch:` line fails the run; a story branch that is 0-ahead with a closed issue is deleted |
 

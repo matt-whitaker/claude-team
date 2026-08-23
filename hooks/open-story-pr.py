@@ -13,6 +13,17 @@ nuisance, a story that can never get its PR is lost work.
 
 BASE is the story branch. On the merge path it is the merged PR's base ref; merged into the
 default branch it is a story PR itself, and there is nothing to open.
+
+⚠️ THIS HOOK'S REACHABILITY USED TO BE A FUNCTION OF *HOW A TASK WAS CLOSED*, AND NOTHING SAID SO.
+Its two call sites — after a landing, and the merge net — are both events the machinery produces.
+A human closing the last task by hand produces neither, so the story reached "every task closed,
+branch ahead, no PR" and stayed there permanently: re-adding the front-door label starts a TASK
+run, and the merge net needs the story PR that is precisely what does not exist (#31). Measured on
+a consumer at v1.1 — the third story there to need its PR opened by hand, each for a different
+reason.
+⚠️ The third call site closes that gap: an `issues: closed` trigger passes ISSUE instead of BASE.
+The hook resolves the story from the closed task's own Branch line, which is the same read every
+other caller does.
 """
 
 import os
@@ -20,9 +31,32 @@ import os
 import team
 
 BASE = os.environ.get("BASE", "")
+# ⚠️ The `issues: closed` path passes this INSTEAD of BASE — a task someone closed by hand.
+ISSUE = os.environ.get("ISSUE", "")
 
 if not team.REPO:
     team.fail("REPO is required")
+
+# ⚠️ POSITIVE GUARD, because this one STARTS WORK. Written negatively — "not a story, so
+# proceed" — an unresolvable issue would open a PR; written positively, only an issue recognised
+# as a task can. That is the #1112 lesson applied: a guard that starts work fails closed.
+#
+# ⚠️ AN AS-IS STORY IS DELIBERATELY EXCLUDED, and the distinction is the same structural one every
+# hook here uses: a task's Branch line names a DIFFERENT issue's branch. Nothing ever closes an
+# as-is story from a run — GitHub closes it natively when its PR merges — so a hand-closed one is
+# a maintainer abandoning it, and opening a PR that says `Closes #N` for an already-closed issue
+# is the wrong answer to that.
+if not BASE and ISSUE:
+    named = team.branch_line(team.issue_body(ISSUE))
+    owner = team.story_from_branch(named) if named else ""
+    if not owner or owner == str(ISSUE):
+        print(
+            f"#{ISSUE} was closed, but it is not a task — its Branch line names "
+            f"{named or 'nothing'}. Nothing to open."
+        )
+        raise SystemExit(0)
+    BASE = named
+    print(f"#{ISSUE} closed by hand; checking its story's branch `{BASE}`.")
 
 repo = team.gh_json("repo", "view", team.REPO, "--json", "defaultBranchRef") or {}
 default = (repo.get("defaultBranchRef") or {}).get("name") or ""
