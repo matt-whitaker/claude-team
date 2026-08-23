@@ -1,6 +1,6 @@
 name: Claude
 
-# ONE WORKFLOW, EIGHT JOBS, EIGHT ROLES. Kept in one file so the Actions history stays
+# ONE WORKFLOW, NINE JOBS, EIGHT ROLES. Kept in one file so the Actions history stays
 # readable: one run per trigger, with whatever was not selected skipping inside it rather
 # than filling the list with skipped runs.
 #
@@ -11,7 +11,12 @@ name: Claude
 #   authors             Implementor | Designer | Tester | Writer — one per run, gated steps
 #   security            on merge, plus on request via @claude/security
 #   custodial           checks what the run left behind — no model
+#   task_closed         a task closed BY HAND — opens the story's PR — no model
 #   merge_housekeeping  on merge — no model
+#
+# ⚠️ NINE JOBS AND EIGHT ROLES, because `task_closed` serves no role. It exists because
+# `open-story-pr.py` was otherwise reachable only from events the machinery produces, so a human
+# closing the last task stranded the story with no gesture that resumes it (#31).
 #
 # ⚠️ A SANDWICH: `delegate` in front, `custodial` behind, and the roles between them. Both ends
 # are scripted first and consult a model only where a script cannot decide. Every check the back
@@ -2060,6 +2065,59 @@ jobs:
   # determined, and this is the only backlog behaviour that has worked from its first
   # run — everything model-driven took three attempts. It is also why PROJECTS_TOKEN
   # lives here and nowhere a prompt can reach it.
+  # ── A task closed by hand ──────────────────────────────────────────────────────
+  # ⚠️ THE ONLY STALL IN THIS SYSTEM THAT HAD NO MANUAL GESTURE TO RESUME IT. `open-story-pr.py`
+  # was reachable from two places, both events the machinery produces: after a landing, and the
+  # merge net. A human closing the last task produces neither — so the story reached "every task
+  # closed, branch ahead, no PR" and stayed there. Re-adding the front-door label starts a TASK
+  # run; the merge net needs the story PR that is precisely what is missing (#31).
+  #
+  # ⚠️ IT CANNOT LOOP, AND THE REASON IS STRUCTURAL RATHER THAN A GUARD. Both hook closes use
+  # `secrets.GITHUB_TOKEN` (work-completion.py and close-merged-work.py), and an event created
+  # with GITHUB_TOKEN starts no workflow run — the same third loop guard the label stamps rely
+  # on. So this fires PRECISELY when the machinery did not close the task, which is the whole
+  # set of cases it exists for. The actor exclusions below are belt-and-braces for a consumer
+  # with automation of its own.
+  #
+  # ⚠️ NO MODEL STEP, deliberately: nothing here is judged. The hook resolves the story from the
+  # closed task's own Branch line and its own guards — already open, not ahead, tasks still
+  # open — make the call idempotent, which the merge net already depends on.
+  #
+  # ⚠️ The custodial job is the obvious place for this and is WRONG for the same reason the merge
+  # net is: it runs post-every-role, which is exactly the set of events that already reach the
+  # hook.
+  task_closed:
+    if: |
+      github.event_name == 'issues'
+      && github.event.action == 'closed'
+      && github.actor != 'claude[bot]'
+      && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # `gh pr create`, and nothing else here needs more.
+      pull-requests: write
+      issues: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stash the agent hooks
+        run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
+      # ⚠️ ISSUE, not BASE. The hook resolves the story branch from the closed task's Branch
+      # line, and returns quietly for anything that is not a task — including an as-is story,
+      # which is never closed from a run, so a hand-closed one means abandoned rather than done.
+      - name: Open the story's PR if that was its last task
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: "$RUNNER_TEMP/agent-bin/open-story-pr.py"
+
   merge_housekeeping:
     # ⚠️ EVERY merged PR, not just an agent's. This gated on a @claude/* label or a Bot
     # author, and skipped on #485 — the maintainer's own PR, unlabeled per convention —

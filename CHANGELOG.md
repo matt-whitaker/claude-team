@@ -35,6 +35,11 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 - **The Architect prompt now names the as-is story** — a story left whole, carrying its own
   `Branch:` line and a `Role:` stamp. No consumer action; it is the shaping side of a path routing
   already supported. Expect fewer unnecessary Writer tasks on small stories.
+- **⚠️ Your stub needs one more trigger type: `types: [labeled, closed]`.** Without it a task
+  closed **by hand** still strands its story permanently — every other path to the story-PR hook is
+  an event the machinery produces, so a human close reached "all tasks closed, branch ahead, no PR"
+  with nothing able to resume it. `closed` is not a second front door: no run is routed from it, and
+  a task closed by a hook fires nothing at all.
 - **⚠️ A role step that succeeds but returns no handoff now FAILS the run.** It used to print
   *"no author ran, or its step failed"* — both halves false in that case — and report success while
   the task stayed open and the story halted. No action, but **expect a previously-green failure

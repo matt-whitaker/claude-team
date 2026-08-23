@@ -23,7 +23,10 @@ run-name: >-
 
 on:
   issues:
-    types: [labeled]
+    # ⚠️ `closed` is NOT a second front door — no run is routed from it. It exists so a task
+    # closed BY HAND can still open its story's PR: every other path to that hook is an
+    # event the machinery produces, so a human close stranded the story permanently (#31).
+    types: [labeled, closed]
   issue_comment:
     types: [created]
   pull_request_review_comment:

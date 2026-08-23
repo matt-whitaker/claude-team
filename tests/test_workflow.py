@@ -9,6 +9,28 @@ STUB = (pathlib.Path(__file__).resolve().parent.parent / "templates/consumer-stu
 SELF = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/claude.yml").read_text()
 
 
+def job_block(text, name):
+    """One job's lines, from its key to the next key at the same indent.
+
+    ⚠️ Line-walked rather than regexed — a lookahead for the NEXT job assumed a blank line before
+    it and silently matched nothing when there wasn't one.
+    ⚠️ Module level rather than a staticmethod on one class: two classes need it, and reaching
+    across for `SomeClass._job` needs `__func__` inside a class body and NOT outside it, which is
+    a trap rather than a design.
+    """
+    out, inside = [], False
+    for line in text.splitlines():
+        if line == f"  {name}:":
+            inside = True
+            continue
+        if inside and re.match(r"^  \S.*:$", line):
+            break
+        if inside:
+            out.append(line)
+    assert out, f"job {name} not found"
+    return "\n".join(out)
+
+
 class TeamWorkflow(unittest.TestCase):
     def test_is_a_reusable_workflow(self):
         self.assertIn("workflow_call:", TEAM)
@@ -204,24 +226,7 @@ class TheConsumerNamesItsOwnToolchain(unittest.TestCase):
     # ARCHITECT, which rewrites issue bodies and runs no gate; matching `--json-schema` swept in
     # the CUSTODIAN and the RESEARCHER, which also return JSON. The job boundary is the thing
     # that actually means "writes code, needs the consumer's gate".
-    @staticmethod
-    def _job(text, name):
-        """One job's lines, from its key to the next key at the same indent.
-        ⚠️ Line-walked rather than regexed — a lookahead for the NEXT job assumed a blank line
-        before it and silently matched nothing when there wasn't one."""
-        lines, out, inside = text.splitlines(), [], False
-        for line in lines:
-            if line == f"  {name}:":
-                inside = True
-                continue
-            if inside and re.match(r"^  \S.*:$", line):
-                break
-            if inside:
-                out.append(line)
-        assert out, f"job {name} not found"
-        return "\n".join(out)
-
-    AUTHORS_JOB = _job.__func__(TEAM, "authors")
+    AUTHORS_JOB = job_block(TEAM, "authors")
 
     AUTHOR_TOOLS = [
         re.search(r'--allowedTools "([^"]*)"', b).group(1)
@@ -469,6 +474,59 @@ class TheEmptyHandoffKeepsItsEvidence(unittest.TestCase):
         for role in ("implementor", "designer", "tester", "writer"):
             with self.subTest(role=role):
                 self.assertIn(f"{role}=${{{{ steps.{role}.outcome }}}}", TEAM)
+
+
+class AHandClosedTaskHasATrigger(unittest.TestCase):
+    """⚠️ #31: `open-story-pr.py` was reachable only from events the machinery produces, so a
+    human closing the last task stranded the story with no gesture that resumes it."""
+
+    def test_the_job_exists_and_gates_on_a_closed_issue(self):
+        self.assertIn("  task_closed:", TEAM)
+        self.assertIn("github.event.action == 'closed'", TEAM)
+
+    def test_the_stub_and_the_self_install_both_listen_for_it(self):
+        """⚠️ A CONSUMER-VISIBLE TRIGGER CHANGE. The stub is frozen, so `closed` never arrives on
+        its own — every consumer edits this line, which is why it is a CHANGELOG action."""
+        for name, text in (("stub", STUB), ("self-install", SELF)):
+            with self.subTest(target=name):
+                self.assertIn("types: [labeled, closed]", text)
+
+    def test_it_carries_no_model_step(self):
+        """Nothing here is judged, and a job with no agent in it is what lets the scripted phases
+        hold write permissions safely."""
+        job = job_block(TEAM, "task_closed")
+        self.assertNotIn("anthropics/claude-code-action", job)
+        self.assertNotIn("claude_args", job)
+
+    def test_it_holds_only_what_gh_pr_create_needs(self):
+        job = job_block(TEAM, "task_closed")
+        self.assertIn("pull-requests: write", job)
+        self.assertIn("contents: read", job)
+        self.assertNotIn("contents: write", job)
+
+    def test_it_passes_the_issue_rather_than_a_base(self):
+        """The caller has an issue number, not a ref — the hook resolves the story branch from
+        the closed task's own Branch line."""
+        job = job_block(TEAM, "task_closed")
+        self.assertIn("ISSUE: ${{ github.event.issue.number }}", job)
+        self.assertNotIn("BASE:", job)
+
+    def test_the_header_counts_the_jobs_it_lists(self):
+        """⚠️ The header is the first thing anyone editing this file reads, and adding a job
+        without it is how it starts lying. Derived from the real job keys, not a pinned number."""
+        import re as _re
+        listed = _re.search(r"# ONE WORKFLOW, (\w+) JOBS", TEAM).group(1)
+        real = len(_re.findall(r"^  [a-z][a-z_]*:$", TEAM, _re.M)) - 1  # less `workflow_call:`
+        words = {8: "EIGHT", 9: "NINE", 10: "TEN"}
+        self.assertEqual(listed, words.get(real, str(real)),
+                         f"header says {listed} jobs; the file defines {real}")
+        self.assertIn("#   task_closed", TEAM)
+
+    def test_the_labeled_trigger_still_only_routes_from_the_front_door(self):
+        """⚠️ `closed` must not become a second front door. The delegate job's own `if:` is what
+        keeps routing gated on the front-door label and comments, and adding a trigger type must
+        not widen it."""
+        self.assertIn("github.event.label.name == '@claude'", TEAM)
 
 
 class ReleasePins(unittest.TestCase):
