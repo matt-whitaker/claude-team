@@ -41,12 +41,42 @@ class TheHarnessRuleIsInstalled(unittest.TestCase):
                                  f"{local!r} is this repo's — it does not belong in a portable rule")
 
 
-class CloudFileCarriesOnlyThisRepo(unittest.TestCase):
-    """⚠️ `CLAUDE_CLOUD.md` is what is left after the portable half moved out. A fact that drifts
+class TheLocalRuleCarriesOnlyThisRepo(unittest.TestCase):
+    """⚠️ `working-here.md` is what is left after the portable half moved out. A fact that drifts
     back into it is invisible to every other repo that would hit the same trap — which is exactly
-    what happened to four git lessons before the split."""
+    what happened to four git lessons before the split.
 
-    CLOUD = (ROOT / "CLAUDE_CLOUD.md").read_text(encoding="utf-8")
+    ⚠️ IT REPLACED `CLAUDE_CLOUD.md`, WHOSE CLOUD-NESS WAS AN ARTIFACT OF DELIVERY. That file
+    existed because a cloud session has no memory and needed a committed one, so it carried a
+    read-only-if-cloud gate, a never-`@path`-import warning, and a merge line dividing template
+    framing from repo content. A rule is committed, loads in both environments, is discovered
+    without being mentioned, and is owned by whoever ships it — so all three devices became
+    unnecessary at once. `test_no_file_needs_a_gate_or_a_merge_line` pins that they stayed gone."""
+
+    # ⚠️ READ IN setUp, NOT THE CLASS BODY — and this is the SECOND time in one session. A
+    # class-body read of a missing file raises at IMPORT, which takes the whole module down and
+    # turns every clean failure into one `unittest.loader._FailedTest`, hiding the rest. Caught
+    # both times only by running the suite against the unfixed tree, which is the entire argument
+    # for doing that before trusting a new test.
+    def setUp(self):
+        path = ROOT / ".claude/rules/working-here.md"
+        self.assertTrue(path.exists(), f"{path} is missing")
+        self.LOCAL = path.read_text(encoding="utf-8")
+
+    def test_the_old_file_is_gone(self):
+        self.assertFalse((ROOT / "CLAUDE_CLOUD.md").exists(),
+                         "CLAUDE_CLOUD.md is superseded by .claude/rules/working-here.md")
+
+    def test_no_file_needs_a_gate_or_a_merge_line(self):
+        """The three workarounds the old shape required. Each returning would mean the content had
+        drifted back into a file that has to be found, imported, or merged."""
+        for device, phrase in (
+            ("the read-only-if-cloud gate", "Read this only if you are"),
+            ("the @path import warning", "unbackticked"),
+            ("the repo-owned merge line", "REPO-OWNED BELOW THIS LINE"),
+        ):
+            with self.subTest(device=device):
+                self.assertNotIn(phrase, self.LOCAL)
 
     def test_the_moved_facts_did_not_drift_back(self):
         moved = {
@@ -58,7 +88,7 @@ class CloudFileCarriesOnlyThisRepo(unittest.TestCase):
         }
         for name, phrase in moved.items():
             with self.subTest(fact=name):
-                self.assertNotIn(phrase, self.CLOUD,
+                self.assertNotIn(phrase, self.LOCAL,
                                  f"{name} belongs in claude-harness, where every repo gets it")
 
     def test_it_still_carries_what_only_this_repo_knows(self):
@@ -66,12 +96,18 @@ class CloudFileCarriesOnlyThisRepo(unittest.TestCase):
         exist nowhere — the board number is the one with no other home."""
         for fact in ("board is 9", "workflow ON ITSELF", "Two pins move together"):
             with self.subTest(fact=fact):
-                self.assertIn(fact, self.CLOUD)
+                self.assertIn(fact, self.LOCAL)
 
     def test_it_says_where_the_portable_half_went(self):
         """A reader who remembers those facts being here must be told where they are now, or the
         move reads as a deletion."""
-        self.assertIn("claude-harness", self.CLOUD)
+        self.assertIn("claude-harness", self.LOCAL)
+
+    def test_both_rules_are_the_only_ones_installed(self):
+        """⚠️ `ls .claude/rules/` is the manifest — that is the whole appeal of the format. A rule
+        appearing without anyone deciding to add it is the manifest ceasing to mean anything."""
+        found = sorted(p.name for p in (ROOT / ".claude/rules").glob("*.md"))
+        self.assertEqual(found, ["claude-harness.md", "working-here.md"])
 
 
 if __name__ == "__main__":

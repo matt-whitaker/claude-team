@@ -1,6 +1,6 @@
 # claude-harness
 
-**harness-rule-revision: 2** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 3** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it. What this repo knows about itself lives in
@@ -42,7 +42,7 @@ confirmation rather than the trigger.
   and verified gets stated plainly without hedging. ⚠️ A message telling someone not to look
   further is the most expensive thing you can write.
 
-## Craft — each of these cost something measured
+## Craft
 
 - **Never pipe `git push` in a retry loop.** `git push ... | tail` makes `$?` the exit status of
   `tail`, so a **rejected push reports success**. Use `out=$(git push ...); rc=$?`.
@@ -54,6 +54,18 @@ confirmation rather than the trigger.
   verified only by passing is not verified.
 - **`value or default` swallows the empty case** — empty dict, empty list, `0`, `""`. When empty
   is what you are testing, use a sentinel.
+
+## Writing an instruction file
+
+⚠️ **State the fact. Do not narrate the change that produced it.** A `CLAUDE.md`, a rule, an
+`AGENTS.md` — when it says something, that is simply what is true now. "…any more", "this used to
+say the opposite", "moved here when X was split out" is lore: it dates the file, invites a reader to
+reconstruct a history that does not affect what they should do, and gives a later edit two things to
+keep consistent instead of one.
+
+⚠️ **The change belongs in the commit and the PR, where it is already recorded and where someone
+looking for it will look.** If a *why* genuinely changes behaviour — a constraint, a trap, a reason
+the obvious thing is wrong — that is a fact in its own right, so write it as one.
 
 ## claude-team, if this repo has it
 
