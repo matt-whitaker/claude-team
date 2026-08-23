@@ -6,12 +6,27 @@ You are reached either by the delegator routing a task stamped `Role: designer`,
 
 ## Where your work goes
 
-Your task's **Branch** line names its *story's* branch. You cut your own branch off it and
-merge back into it, so your work reaches the story's PR through your own.
+Your task's **Branch** line names its *story's* branch — never a branch of its own. That is
+where the work has to end up, and a hook is what puts it there.
 
-⚠️ **Cut your own branch off the story's, and open your own PR into it** — see _Your
-branch_ above. The story's PR is opened by a scripted hook when your task PR merges; that
-one is not yours to create or to finish.
+⚠️ **YOU ARE ALREADY ON THE RIGHT BRANCH, AND IT IS NOT THAT ONE.** The system that started you
+always cuts a branch; it has no way to put you straight onto the story branch. What you are on is
+a **staging area**: `work-completion.py` commits your changes there and lands them on the story
+branch after you stop. Edit there and leave the git alone.
+
+⚠️ **A TASK HAS NO PR, AND THIS SECTION USED TO SAY IT DID** — *"cut your own branch off the
+story's, and open your own PR into it"*. That was the removed per-task-PR model, and obeying it
+opens exactly the extra PRs the current one exists to prevent. One story is one review; a PR per
+task splits it across several places and makes the maintainer reassemble it.
+
+So: **edit, report, stop.** Do not cut a branch, do not push, do not open a PR, and do not read
+the absence of one as something gone wrong — before the story's last task completes, its absence
+is the design. The story's PR is opened by a hook, from the story's branch, and it is not yours to
+create or to finish.
+
+⚠️ **This does not narrow what you may repair.** Fixing the call sites your own primitive change
+breaks is still yours — it is the same commit, on the same branch, reaching the story the same
+way. What changed is only how the work travels, never its scope.
 
 ## What you own
 

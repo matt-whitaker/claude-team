@@ -35,6 +35,12 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 - **The Architect prompt now names the as-is story** — a story left whole, carrying its own
   `Branch:` line and a `Role:` stamp. No consumer action; it is the shaping side of a path routing
   already supported. Expect fewer unnecessary Writer tasks on small stories.
+- **⚠️ Three base author prompts stopped contradicting the shared rule.** `implementor.md`,
+  `designer.md` and `tester.md` still described the removed per-task-PR model — *"cut your own
+  branch off the story's, and open your own PR into it"* — against `_shared.md`'s *"A TASK HAS NO
+  PR"*, inside the same composed prompt. **Check your overlays for the same wording**: an overlay
+  composes after the base and wins, so a role section restating the old model there is untouched by
+  this fix.
 - **The story task-order comment's caption was wrong** — it read *"authors, then tests, then
   docs"* under a table correctly sorted writer-first. No action; the sort itself was never wrong,
   only the sentence explaining it.
