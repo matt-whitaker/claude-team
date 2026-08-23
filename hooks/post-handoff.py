@@ -25,13 +25,68 @@ ISSUE = os.environ.get("ISSUE", "")
 PR = os.environ.get("PR", "")
 STORY = os.environ.get("STORY", "")
 ROLES = os.environ.get("ROLES", "").strip()
+# ⚠️ `role=outcome` pairs for all four author steps, because `||` cannot pick between them here.
+# A skipped step's outcome is the truthy string "skipped", so the `||` chain used for
+# `structured_output` would always take the first one and report the wrong step's fate.
+OUTCOMES = os.environ.get("OUTCOMES", "")
 
 if not team.REPO:
     team.fail("REPO is required")
 
+
+def _outcome(role: str) -> str:
+    for pair in OUTCOMES.split():
+        name, _, value = pair.partition("=")
+        if name == role:
+            return value
+    return ""
+
+
+def _note(key: str, value: str) -> None:
+    """A step output for the caller — used to ungate transcript capture."""
+    path = os.environ.get("GITHUB_OUTPUT")
+    if path:
+        with open(path, "a") as fh:
+            fh.write(f"{key}={value}\n")
+
+
+# ⚠️ THREE CASES, AND THIS USED TO PRINT ONE SENTENCE THAT WAS FALSE IN THE WORST OF THEM.
+# It said "no author ran, or its step failed" — and the case that actually halts a story is the
+# third: an author RAN, its step SUCCEEDED, and it returned nothing usable. Both halves of that
+# sentence are false there, so the one line a reader got sent them looking for a skipped job or a
+# red step, neither of which existed (#32). Measured on a consumer at v1.1: the tester step ran
+# 2m27s and completed, `HANDOFF` was empty, every `closed`-gated step skipped, and the task sat
+# open until a human closed it fourteen hours later — at which point nothing could open the
+# story's PR at all (#31).
 if not HANDOFF:
-    print("No handoff to post — no author ran, or its step failed.")
-    raise SystemExit(0)
+    ran = [r for r in ROLES.split() if _outcome(r) not in ("", "skipped")]
+    if not ran:
+        print("No handoff to post — no author ran.")
+        raise SystemExit(0)
+
+    failed = [r for r in ran if _outcome(r) != "success"]
+    if failed:
+        print(
+            "No handoff to post — "
+            + ", ".join(f"the {r} step {_outcome(r)}" for r in failed)
+            + ". The red step above is the signal; this is not a separate fault."
+        )
+        raise SystemExit(0)
+
+    # ⚠️ THE ONE THAT HALTS A STORY, AND IT REPORTED SUCCESS FOR AS LONG AS IT EXISTED. No task
+    # closes, every `closed`-gated step skips, and nothing anywhere says why — so this is an
+    # error, not a line. ⚠️ Keep the evidence too: `evidence=true` ungates transcript capture in
+    # the caller, because WHY the step produced nothing is unknowable from anything else the run
+    # keeps, and this is exactly the run that needed it.
+    _note("evidence", "true")
+    team.fail(
+        "The "
+        + ", ".join(ran)
+        + " step ran and SUCCEEDED but returned no handoff, so this task will not close and the "
+        "story is halted. Nothing failed upstream — the model emitted no structured output, or "
+        "emitted something the schema rejected. Re-trigger the task; if it recurs, the captured "
+        "transcript is the only artifact that can say which."
+    )
 
 # ⚠️ A PR FOLLOW-UP MUST REACH THE STORY, and for a long time it did not. This read
 # `if not ISSUE: exit` — and the workflow blanks ISSUE on a PR trigger — so the hook returned

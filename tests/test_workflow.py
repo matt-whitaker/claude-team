@@ -443,6 +443,34 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
         self.assertIn("CHANGELOG.md", release)
 
 
+class TheEmptyHandoffKeepsItsEvidence(unittest.TestCase):
+    """⚠️ #32, second half. A role step that succeeds and returns no handoff silently halts a
+    story, and WHY it produced nothing is unknowable from anything else the run keeps. On the run
+    that produced the issue, `AGENT_TRANSCRIPTS` was unset — so the channel-with-no-reader failure
+    landed on exactly the run that needed it."""
+
+    def test_the_handoff_step_is_addressable(self):
+        """Guards the two assertions below: without the id, `steps.handoff.outputs` resolves to
+        nothing and the override silently never fires."""
+        self.assertIn("id: handoff", TEAM)
+
+    def test_a_successful_step_with_no_handoff_overrides_the_toggle(self):
+        self.assertIn("steps.handoff.outputs.evidence == 'true'", TEAM)
+
+    def test_the_toggle_still_governs_every_other_case(self):
+        """The override is an OR, not a replacement — an ordinary run stays inert until someone
+        opts in, which is what keeps transcripts off a public console by default."""
+        self.assertIn("contains(vars.AGENT_TRANSCRIPTS, 'authors')", TEAM)
+
+    def test_all_four_author_outcomes_reach_the_hook(self):
+        """⚠️ Pairs, not a `||` chain. A skipped step's outcome is the truthy string "skipped",
+        so the chain used for `structured_output` would always take the first and name the wrong
+        step's fate — which is the misreport this whole issue is about."""
+        for role in ("implementor", "designer", "tester", "writer"):
+            with self.subTest(role=role):
+                self.assertIn(f"{role}=${{{{ steps.{role}.outcome }}}}", TEAM)
+
+
 class ReleasePins(unittest.TestCase):
     """Every pin that must move together at release time, asserted equal on every push.
 

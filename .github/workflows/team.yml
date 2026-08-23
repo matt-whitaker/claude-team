@@ -1800,6 +1800,7 @@ jobs:
           LANDED_REF: ${{ steps.completion.outputs.landed_ref }}
         run: "$RUNNER_TEMP/agent-bin/finish-pr.py"
       - name: Persist the author's handoff
+        id: handoff
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -1819,6 +1820,16 @@ jobs:
           # takes the one that produced output. Empty when neither ran or the step failed,
           # which the hook treats as "nothing to post" rather than an error.
           HANDOFF: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output || steps.tester.outputs.structured_output || steps.writer.outputs.structured_output }}
+          # ⚠️ ALL FOUR, AS PAIRS, because `||` cannot pick between outcomes the way it picks
+          # between outputs: a skipped step's outcome is the truthy string "skipped", so the
+          # chain would always take the first and name the wrong step. This is what lets the
+          # hook tell "no author ran" from "its step failed" from "it ran, succeeded, and
+          # returned nothing" — the third being the one that silently halts a story (#32).
+          OUTCOMES: >-
+            implementor=${{ steps.implementor.outcome }}
+            designer=${{ steps.designer.outcome }}
+            tester=${{ steps.tester.outcome }}
+            writer=${{ steps.writer.outcome }}
         run: "$RUNNER_TEMP/agent-bin/post-handoff.py"
       - name: Update the story's task order
         if: always()
@@ -1840,12 +1851,21 @@ jobs:
       # `always()` so a FAILED run still yields its transcript, which is when you most want one.
       # ⚠️ Turned on and off at runtime by the AGENT_TRANSCRIPTS repository variable; unset means
       # off, so this is inert until someone opts in. See .github/actions/capture-transcript.
+      #
+      # ⚠️ ONE CASE OVERRIDES THE TOGGLE, and it is the case that most needs the file: a role
+      # step that SUCCEEDED and returned no handoff. That silently halts a story, and WHY it
+      # produced nothing is unknowable from anything else the run keeps — the transcript is the
+      # only artifact that can say whether the model emitted nothing, emitted something the
+      # schema rejected, or emitted it where the action did not read. Measured on the run that
+      # produced #32, `AGENT_TRANSCRIPTS` was unset, so the channel-with-no-reader failure landed
+      # on exactly the run that needed it. Mirrors the action's own upstream-error diagnosis,
+      # which is ungated for the same stated reason.
       - name: Capture the transcript
         if: always()
         continue-on-error: true
         uses: matt-whitaker/claude-team/.github/actions/capture-transcript@mainline
         with:
-          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'authors') }}
+          enabled: ${{ contains(vars.AGENT_TRANSCRIPTS, 'all') || contains(vars.AGENT_TRANSCRIPTS, 'authors') || steps.handoff.outputs.evidence == 'true' }}
           role: ${{ needs.delegate.outputs.roles }}
           execution_file: ${{ steps.implementor.outputs.execution_file || steps.designer.outputs.execution_file || steps.tester.outputs.execution_file || steps.writer.outputs.execution_file }}
           role_arn: ${{ secrets.AWS_TRANSCRIPTS_ROLE }}
