@@ -220,6 +220,20 @@ test is scripted, not judged: a task's `Branch:` line names its *story's* branch
 `story_from_branch(named) != ISSUE`; when they are **equal**, the executing issue owns that branch
 and its work is the whole story. There is no parent for it to merge into.
 
+⚠️ **AND THE ARCHITECT MUST BE TOLD IT MAY PRODUCE ONE, WHICH FOR A LONG TIME IT WAS NOT.**
+`prompts/_shared.md` described the as-is story from the **author's** side — *"You are a STORY
+worked as-is"* — which tells a role what it *is*, never that shaping may end there.
+`prompts/architect.md` was silent on it, so the prompt described two of the three shapes
+`delegate.py` routes: a story with tasks dispatches its first wave, one with no tasks falls
+through to its stamped author, and one with neither stamp nor tasks defaults to the Implementor
+and announces the guess on the issue at **every** trigger.
+⚠️ **It worked anyway once, and that is what hid it.** The Architect on #43 reached the right
+shape by citing **CLAUDE.md** — this repo's own file, which in a consumer belongs to the consumer
+and says nothing of the sort. Behaviour that depends on the package being its own consumer is not
+portable, and the drill only passed because the answer happened to be lying around.
+⚠️ **The stamp is the expensive half.** A Branch line with no Role line is the one shape that
+costs a run before any work starts, and it recurs on every trigger rather than once.
+
 ⚠️ **Retargeting one of those onto its own story branch is the failure**, and it looks like
 correctness. The work lands on a branch nobody has merged, `close-merged-work.py` closes the story
 on that merge anyway, and finishing it then needs a second PR for an issue that is already closed —
@@ -803,11 +817,25 @@ a document is deriving from the implementation at one remove, with the rule agai
 satisfied. Ordering the Writer ahead of the authors makes "from intent, not from the diff" true
 by construction rather than by instruction, and hands the authors a sharper brief besides.
 
-⚠️ **Its task is cut on EVERY story, unconditionally; the Tester's is judged.** Every story
-changes what the product does, so there is always something to specify. Before the spec existed
-the argument was weaker — the Architect could not predict `docsCandidates`, and asked to guess
-it answered "no" every time: across every story before that rule, not one Writer task was ever
-cut.
+⚠️ **Its task is cut on every story THAT DIVIDES, and inside that scope it is unconditional;
+the Tester's is judged.** Every story changes what the product does, so there is always something
+to specify. Before the spec existed the argument was weaker — the Architect could not predict
+`docsCandidates`, and asked to guess it answered "no" every time: across every story before that
+rule, not one Writer task was ever cut.
+
+⚠️ **THE UNSCOPED WORDING CONTRADICTED THE DON'T-SPLIT RULE, AND BOTH WERE ABSOLUTE.** *"A story
+one author can finish should not be split"* against *"a `Role: writer` task on EVERY story,
+Always — not a judgement call"*: a Writer task **is** a task, so obeying the second made the
+first unreachable, with no precedence stated anywhere. A run had to disobey one silently, and
+did (#47).
+⚠️ **The scope is the fix; softening the rule is not.** *"Cut one where it seems needed"* reverts
+to precisely the failure that produced the rule. What changed is **which decision the Architect
+is making**: the size question in step 4, which it was making anyway — not "does this deserve a
+spec", which it has answered wrong every time it was asked.
+⚠️ **The discriminator is stated rather than left to feel:** *does a specification need writing
+before the code?* If yes, the story divides and the Writer task is cut first. Ambiguity resolves
+to **divide** — an unnecessary Writer run is one cheap run reporting nothing to specify, and a
+skipped necessary one is a story shipping with nothing saying what the product now promises.
 
 ⚠️ **Running first strands `docsCandidates`, and that must be handled rather than left.** The
 authors emit them after the Writer has finished, so nothing consumes them in the same story — a

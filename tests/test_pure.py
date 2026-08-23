@@ -117,9 +117,6 @@ class ArchitectPromptExamplesParse(unittest.TestCase):
         self.assertIn("NEVER AS PROSE", self.prompt)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class RepairSchemaMatchesTheHook(unittest.TestCase):
     """The schema is what the model reads; the hook is what enforces. They must agree."""
 
@@ -131,3 +128,58 @@ class RepairSchemaMatchesTheHook(unittest.TestCase):
         schema = json.dumps(json.load(open(root / "schemas/repairs.json")))
         missing = [label for label in allowed if label not in schema]
         self.assertEqual(missing, [], f"the hook accepts {missing} but the schema never mentions them")
+
+
+class TheArchitectPromptNamesTheAsIsStory(unittest.TestCase):
+    """⚠️ #47: THE PROMPT DESCRIBED TWO OF THE THREE SHAPES A STORY CAN END IN.
+
+    `delegate.py` routes three ways — a story WITH tasks dispatches its first wave, a story with
+    no tasks falls through to its stamped author (the as-is path), and one with neither stamp nor
+    tasks defaults to the Implementor and announces the guess. The prompt described the first,
+    was silent on the second, and carried two absolute rules that could not both hold on a small
+    story: *don't split what one author can finish* against *a Writer task on EVERY story,
+    always*. A Writer task is a task, so obeying the second made the first unreachable.
+
+    The Architect got it right on #43 anyway — by citing **CLAUDE.md**, which is this repo's own
+    file and says nothing of the sort in a consumer. Prose review passed the contradiction, so it
+    is pinned here instead."""
+
+    def setUp(self):
+        root = pathlib.Path(__file__).resolve().parent.parent
+        self.prompt = (root / "prompts/architect.md").read_text()
+
+    def test_the_as_is_story_is_named_as_an_outcome(self):
+        self.assertIn("AS-IS STORY", self.prompt)
+
+    def test_the_story_level_role_stamp_is_shown(self):
+        """The stamp is what routing reads. Without it the router guesses and says so on the
+        issue at every trigger — so the prompt has to show the line, not just mention it."""
+        self.assertRegex(
+            self.prompt,
+            r"\*\*Role: <implementor\|designer\|tester\|writer>\*\*",
+            "the as-is story's Role line is not shown as a literal the Architect can copy")
+
+    def test_the_writer_rule_is_scoped_rather_than_unconditional(self):
+        """⚠️ BOTH DIRECTIONS MATTER. Unscoped, it contradicts 'do not split a one-author
+        story'. Softened to a judgement, it reverts to the failure that produced it — asked to
+        predict whether documentation was needed, the Architect answered no on every story ever
+        shaped. So: scoped to stories that divide, and still not a judgement inside that scope."""
+        self.assertNotIn("task on EVERY story", self.prompt)
+        self.assertIn("every story you cut into tasks", self.prompt)
+        self.assertRegex(
+            self.prompt, r"not a judgement\s+call once the story divides",
+            "the Writer rule is unscoped again — it contradicts step 4 that way")
+
+    def test_the_reason_the_rule_exists_survives_the_rescoping(self):
+        """A rule with its history removed is the one a later edit softens away."""
+        self.assertIn("not one Writer task was ever cut", self.prompt)
+
+    def test_the_discriminator_is_stated_rather_than_left_to_feel(self):
+        self.assertIn("whether a specification needs writing before the code", self.prompt)
+
+    def test_ambiguity_resolves_towards_dividing(self):
+        self.assertIn("In doubt, divide", self.prompt)
+
+
+if __name__ == "__main__":
+    unittest.main()
