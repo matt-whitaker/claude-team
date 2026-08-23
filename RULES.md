@@ -400,17 +400,17 @@ one.
 The record's *form* is as load-bearing as its content. These are the conventions that make a ⚠️
 paragraph worth keeping.
 
-### W1 — A rule earns its place by a measured failure, not by taste.
+### W1 — A rule earns its place by a measured failure. Cite it where someone will argue; state it flatly where they will not.
 
-Run numbers, issue numbers, what it cost, how long it ran. A ⚠️ that argues from principle alone is a
-preference wearing the marker's clothes.
+A ⚠️ that argues from principle alone is a preference wearing the marker's clothes. But a receipt on
+every sentence is how a record reaches sixteen thousand words — evidence is for the claim a reader
+will dispute, not for all of them.
 
 ### W2 — Name the wrong fix, not just the right one.
 
-Half the value here is closing off the attractive wrong turn: *"the obvious fix is worse"*,
-*"`git-push.sh` is NOT the fix"*, *"a denylist is not available"*, *"taking the secret away is not
-available, and that was the first fix attempted"*, *"anyone reaching for that fix should stop here"*.
-A rule that only says what to do gets re-litigated by the next person who has the bad idea.
+*"`git-push.sh` is NOT the fix, though its presence in the base allowlist suggests it is."* Without
+that line the next person spends an afternoon finding out. A rule that only says what to do gets
+re-litigated by whoever next has the bad idea.
 
 ### W3 — A superseded rule stays, with what was tried and why it failed.
 
@@ -425,30 +425,19 @@ fix — #1159 is the fix for #1140 reproducing the same shape one level down.
 
 ### W5 — State the discriminator, not the feeling.
 
-*"The two halves read as a contradiction unless the discriminator is stated."* Name the behaviour
-(backgrounding), not the mood (giving up). Name the test (*does a specification need writing before
-the code?*), not the judgement (*does this deserve a spec?*) — a role asked the second question
-answered it wrong every time.
+Name the behaviour (backgrounding), not the mood (giving up). Name the test (*does a specification
+need writing before the code?*), not the judgement (*does this deserve a spec?*) — a role asked the
+second question answered it wrong every time.
 
-### W6 — Count the instances, out loud.
+### W6 — Twice is the threshold. After that, assert it instead of restating it.
 
-*"The fifth instance of this exact shape."* *"This is the sixth dead channel here."* *"Since this is
-the third instance."* A counted recurrence is the argument for changing the **mechanism** rather than
-the wording — and it is what tells you when W7 applies.
+Counting the instances is what tells you when you are there, and the count is a working note rather
+than something to publish. *"Prose review had already passed this twice"* is the sentence that should
+produce a test, not a stronger adjective. *"This trap survived being documented and was written again
+anyway, twice"* is the same signal, unheeded.
 
-### W7 — Twice is the threshold. After that, assert it instead of restating it.
+### W7 — A rule with a price says the price.
 
-This is E17 turned on the rule writer. *"Prose review had already passed this twice"* is the sentence
-that should trigger a test rather than a stronger adjective. *"This trap survived being documented and
-was written again anyway, twice"* is the same signal, unheeded.
-
-### W8 — Say what it cost, and what accepting it costs.
-
-*"The cost, accepted: a story branch that exists even when a run produces nothing."* *"Chosen with the
-cost stated."* *"With the accepted cost that a hand-written sub-issue is never auto-parented."* A rule
-whose price is unstated will be reversed by whoever next pays it.
-
-### W9 — An example inside a rule is itself a rule. Test it.
-
-E14 applies to this file too. Any worked example here that a script could parse should be parsed by
-the suite, or it will drift from the prose around it and win.
+*"The cost, accepted: a story branch that exists even when a run produces nothing."* *"With the
+accepted cost that a hand-written sub-issue is never auto-parented."* A rule whose price is unstated
+will be reversed by whoever next pays it.
