@@ -347,6 +347,102 @@ class TheRuntimesResolverActuallyRuns(unittest.TestCase):
                 self.assertIn("::error::", r.stdout + r.stderr)
 
 
+class TheReturningConsumerHasAPath(unittest.TestCase):
+    """⚠️ #39: ONBOARDING INSTALLED AND NEVER RE-INSTALLED. Every step was written for a fresh
+    target — §2 creates the stub, §3 creates overlays, §7 is a first-run drill — so a session
+    pointed at an installed repo had no instruction for the case it was actually in, and the
+    consumer half of an upgrade was never stated anywhere. "Upgrade" meant bump the ref and hope.
+
+    ⚠️ The version signal already existed: the `vN` tags and the `@ref` in every consumer's stub.
+    What was missing is what a bump *requires*, and what a bump can never carry."""
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    # ⚠️ READ IN setUp, NOT THE CLASS BODY. The other classes here read at module scope, which is
+    # fine for files that have always existed — but a class-body read of a file this change is
+    # INTRODUCING raises at import time, which takes the whole module down and hides every
+    # unrelated test in it. Caught by running these against mainline: the intended assertion
+    # failure arrived as `unittest.loader._FailedTest` with 40-odd other tests silently gone.
+    def setUp(self):
+        missing = [f for f in ("ONBOARDING.md", "CHANGELOG.md", "CLAUDE.md")
+                   if not (self.ROOT / f).exists()]
+        self.assertFalse(missing, f"required file(s) absent: {missing}")
+        self.ONBOARDING = (self.ROOT / "ONBOARDING.md").read_text()
+        self.CHANGELOG = (self.ROOT / "CHANGELOG.md").read_text()
+        self.CLAUDEMD = (self.ROOT / "CLAUDE.md").read_text()
+
+    def test_the_upgrade_path_comes_before_the_install_steps(self):
+        """⚠️ A returning reader must not have to read §1-§7 to discover they are in the wrong
+        place — §3 would overwrite an overlay carrying the repo's whole personality."""
+        upgrade = self.ONBOARDING.index("## 0. Already installed?")
+        first_install_step = self.ONBOARDING.index("## 1. Decide the four inputs")
+        self.assertLess(upgrade, first_install_step)
+
+    def test_the_install_steps_are_signposted_as_not_for_a_returning_reader(self):
+        self.assertRegex(self.ONBOARDING, r"ALREADY INSTALLED.*§0")
+
+    def test_the_case_is_detected_from_the_pin_not_a_new_number(self):
+        """⚠️ Copying claude-code's revision integer would be wrong: it needed one because its
+        install target is a session's knowledge and nothing else numbered it. Here the pin already
+        is the version, and a second number beside it invents a fact that exists."""
+        self.assertIn("the pin *is* the signal", self.ONBOARDING)
+        self.assertIn("git ls-remote --tags", self.ONBOARDING)
+
+    def test_the_consumer_is_never_told_to_edit_TEAM_REF(self):
+        """It lives inside the workflow and moves with the tag. A consumer holds exactly one pin."""
+        section = self.ONBOARDING[
+            self.ONBOARDING.index("## 0."):self.ONBOARDING.index("## 1.")]
+        self.assertIn("only pin a consumer holds", section)
+
+    def test_the_pin_cannot_carry_labels_and_the_path_says_so(self):
+        """⚠️ THE HALF NO VERSION NUMBER REACHES. Labels live in GitHub, not the clone, so no ref
+        bump has ever touched them — and the one step already written to be idempotent is the one
+        that drifted, because nothing told anyone to re-run it."""
+        section = self.ONBOARDING[
+            self.ONBOARDING.index("## 0."):self.ONBOARDING.index("## 1.")]
+        self.assertIn("unconditionally", section)
+        for carried in ("label", "board", "settings"):
+            with self.subTest(item=carried):
+                self.assertIn(carried, section.lower())
+
+    def test_the_overlay_wins_over_a_tightened_base_rule(self):
+        """⚠️ Measured, not hypothetical: the Writer's scope was narrowed in the base and two
+        consumer overlays went on granting what had just been removed."""
+        section = self.ONBOARDING[
+            self.ONBOARDING.index("## 0."):self.ONBOARDING.index("## 1.")]
+        self.assertIn("composes *after* the base", section)
+
+    def test_every_changelog_version_states_whether_to_act(self):
+        """⚠️ THE ONLY QUESTION A CONSUMER HAS. A list of merged PRs cannot answer it, so the
+        marker is asserted rather than trusted to habit — `no` is the commonest answer and the
+        most valuable one."""
+        headings = [m for m in re.finditer(r"^## (.+)$", self.CHANGELOG, re.M)]
+        self.assertTrue(headings, "the changelog has no version headings")
+        for i, head in enumerate(headings):
+            end = headings[i + 1].start() if i + 1 < len(headings) else len(self.CHANGELOG)
+            body = self.CHANGELOG[head.end():end]
+            with self.subTest(version=head.group(1)):
+                self.assertRegex(
+                    body, r"\*\*Action required:\*\* (yes|no|n/a|unknown)",
+                    f"{head.group(1)} does not say whether a consumer must act")
+
+    def test_there_is_always_somewhere_to_write_the_next_entry(self):
+        """⚠️ The entry is written in the PR that CAUSES it. Reconstructing consumer impact from a
+        merge log is the work this file exists to remove, and it is done worst by whoever is trying
+        to cut a tag."""
+        self.assertIn("## Unreleased", self.CHANGELOG)
+
+    def test_the_changelog_says_what_it_is_not(self):
+        self.assertIn("not a merge log", self.CHANGELOG)
+
+    def test_the_release_procedure_renames_the_unreleased_heading(self):
+        """⚠️ A changelog nobody is told to roll over accumulates one permanent Unreleased section
+        and stops distinguishing versions — which is the whole mechanism §0 reads."""
+        release = self.CLAUDEMD[self.CLAUDEMD.index("**Releasing**"):][:600]
+        self.assertIn("Unreleased", release)
+        self.assertIn("CHANGELOG.md", release)
+
+
 class ReleasePins(unittest.TestCase):
     """Every pin that must move together at release time, asserted equal on every push.
 
