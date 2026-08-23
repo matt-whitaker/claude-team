@@ -35,6 +35,9 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 - **The Architect prompt now names the as-is story** — a story left whole, carrying its own
   `Branch:` line and a `Role:` stamp. No consumer action; it is the shaping side of a path routing
   already supported. Expect fewer unnecessary Writer tasks on small stories.
+- **The story task-order comment's caption was wrong** — it read *"authors, then tests, then
+  docs"* under a table correctly sorted writer-first. No action; the sort itself was never wrong,
+  only the sentence explaining it.
 - **Story PRs and landings report their failures.** `open-story-pr.py` now says what `gh` refused
   and names the two usual causes; `finish-pr.py` no longer reports landed work as stranded. No
   action — but if you have been opening story PRs by hand, the next failure will tell you why.
