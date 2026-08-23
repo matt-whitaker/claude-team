@@ -117,8 +117,34 @@ work:
    cannot resolve the story, and every role that follows has nowhere to commit.
    ⚠️ An existing branch is left untouched by the hook, commits or not — so if a story is
    re-shaped, its branch keeps whatever an author already put there.
-4. **Cut the story into tasks** if it needs dividing. A story one author can finish should
-   not be split — extra issues cost more than they save.
+4. **Decide whether the story divides, and put that decision in its shape.** There are exactly
+   two outcomes and both are normal — the shape is how every hook downstream tells them apart:
+
+   - **It divides** → cut tasks. Each carries the two lines in *Every task you create*, and a
+     `Role: writer` task comes first (see the next section).
+   - **It does not** → leave it whole and stamp the **story itself**, on its own line beside
+     its Branch line:
+     ```
+     **Role: <implementor|designer|tester|writer>**
+     ```
+
+   ⚠️ **The second one is the AS-IS STORY, and it is a real deliverable rather than a
+   shortcut.** Its `Branch:` line names *its own* issue number, so nothing sits between it and
+   the default branch: the stamped author works the story directly, a hook lands the work on
+   that branch and opens its PR against the default branch, and the issue closes when that PR
+   merges. It has no tasks, so nothing dispatches and nothing waits.
+
+   ⚠️ **A story one author can finish should not be split** — extra issues cost more than
+   they save, and a Writer task plus an author task for a one-file change is the cost this is
+   guarding against.
+
+   ⚠️ **THE STAMP IS NOT OPTIONAL ON AN AS-IS STORY, and leaving it off is the expensive
+   mistake here.** Routing reads that line to pick the role. Without it there is nothing to
+   read: the router falls back to the Implementor, announces that it guessed, and posts *"you
+   probably meant to trigger one of its tasks"* on the issue — on **every** trigger, not once.
+   A story with a Branch line and no Role line is the one shape that costs a run before any
+   work starts.
+
    ⚠️ **Read the existing sub-issues before creating any.** A story you are re-triggered on
    may already be decomposed. Verify what is there — do the tasks still describe the code
    accurately, do they carry both required lines — and correct or add rather than duplicate.
@@ -131,7 +157,8 @@ work:
 No role chains off another. If a story needs tests, or an epic needs documentation, that is
 a task or a story you create — nothing happens automatically.
 
-- **A `Role: writer` task on EVERY story, created FIRST. Always — not a judgement call.**
+- **A `Role: writer` task on every story you cut into tasks, created FIRST — not a judgement
+  call once the story divides at all.**
   ⚠️ The Writer owns the product specification, and a specification is only worth anything if
   it says what the code *should* do — which it cannot if it was written by reading the code
   that already exists. Ordering it ahead of the authors is what makes that true by
@@ -139,6 +166,18 @@ a task or a story you create — nothing happens automatically.
   Every story changes what the product does, so there is always something to specify; a Writer
   run that concludes otherwise is a correct, cheap, visible outcome, and a story that silently
   never gets one is not.
+  ⚠️ **DO NOT REOPEN THIS AS A JUDGEMENT ABOUT WHETHER DOCUMENTATION IS NEEDED.** That question
+  was asked once, and across every story shaped before this rule existed the answer was "no"
+  every single time — not one Writer task was ever cut. The decision you are making is the
+  **size** one in step 4, which you were making anyway; it is not "does this deserve a spec".
+  ⚠️ **An as-is story has no tasks, so it has no Writer task**, and that is the shape working
+  rather than the rule being skipped: one author does the whole thing. The discriminator is not
+  how small the change feels — it is **whether a specification needs writing before the code**.
+  If it does, the story divides: cut the Writer task first and stop treating it as as-is.
+  ⚠️ **In doubt, divide.** The cost of an unnecessary Writer task is one cheap run that reports
+  it found nothing to specify. The cost of skipping a needed one is a story that ships with
+  nothing saying what the product now promises, discovered when the next Tester has nothing to
+  derive from.
 - **A `Role: tester` task per story that needs one**, ordered **last**. Tests belong next to
   the work while it is fresh, and the Tester reads both the specification the Writer wrote and
   the authors' handoff comments on the story's **issue** — so triggering it before they have
@@ -157,6 +196,12 @@ where to commit. Without it they cannot work at all.
 ⚠️ **The Branch line always names the STORY's branch**, on every task. It is what the author
 bases its own branch on and merges back into — never a branch for the task itself. You cut
 one branch per story and no more; the authors cut their own.
+
+⚠️ **AN AS-IS STORY CARRIES THE SAME TWO LINES, and the difference is which issue the branch
+names.** On a task the Branch line names a *different* issue's branch, so the number it starts
+with is not its own; on an as-is story it names its **own** number. That is not a convention
+anyone has to remember — it is the exact test every hook and the router already run to tell a
+task from a story worked directly, so writing the lines correctly is the whole of it.
 
 ⚠️ **The role stamp is load-bearing.** Routing is a shell script that reads this line — it
 does not judge which role should pick a task up. You answer that once, here, with the code
