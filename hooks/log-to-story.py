@@ -36,6 +36,21 @@ if not tasks:
     raise SystemExit(0)
 
 
+# ⚠️ ONE SOURCE FOR BOTH THE SORT AND THE SENTENCE THAT EXPLAINS IT. These were two
+# independent statements of the same fact and they drifted: the caption read "authors, then
+# tests, then docs" while `phase()` had put the writer FIRST, so it named the exact inversion
+# the writer's position exists to prevent (#30). The caption is now built from this tuple, so
+# there is nothing left to disagree with.
+#
+# ⚠️ Named for the ROLE STAMPS rather than the deliverables — "the writer", not "docs". The
+# table printed directly above the caption has a role column showing `writer` and `tester`, so
+# a reader matches the sentence to what they are looking at. "docs" also understates phase 1
+# and quietly echoes the docs-come-last reading this defect was made of: the Writer's first
+# deliverable is the product specification, and running before the authors is the whole point.
+PHASES = ((1, "the writer"), (2, "the authors"), (3, "the tester"))
+_RANK = {"writer": 1, "tester": 3}
+
+
 def phase(role: str) -> int:
     """The writer first, then the authors, then the tester.
 
@@ -47,7 +62,7 @@ def phase(role: str) -> int:
     An unstamped task sorts with the authors — routing defaults it to an author too, so the two
     stay consistent.
     """
-    return {"writer": 1, "tester": 3}.get(role, 2)
+    return _RANK.get(role, 2)
 
 
 rows = []
@@ -91,7 +106,10 @@ for row in rows:
 
 lines += [
     "",
-    "Order is derived — authors, then tests, then docs; by issue number within each.",
+    # Derived, never restated — see PHASES.
+    "Order is derived — "
+    + ", then ".join(name for _, name in PHASES)
+    + "; by issue number within each.",
     "Rewritten automatically whenever a task changes state.",
 ]
 
