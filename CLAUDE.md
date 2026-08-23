@@ -14,16 +14,18 @@ deliberately stale refs, the condition sandboxes kept lacking.
 ⚠️ **Releasing**: check out mainline, flip every pin (`TEAM_REF`, the in-workflow `@refs`,
 `load-prompt`'s default, the stub template) from `mainline` to `vN` in one commit, run the suite
 (`ReleasePins` asserts the agreement), tag that commit `vN`, push the tag, and **do not merge the
-release commit** — mainline keeps its canary pins. Consumers pin `@vN`; brewdocs.beer alone tracks
-`@mainline`.
+release commit** — mainline keeps its canary pins. Consumers pin `@vN`; a repo whose job is to
+exercise the engine tracks `@mainline` instead — brewdocs.beer as the canary, `claude-team-example`
+as the drill target, and this repo's own stub, which `SelfInstall` pins there permanently.
+⚠️ **brewdocs.beer-kb tracks `@mainline` without that justification** — it ships product, so the rule
+says pin it. Kept on the edge by the maintainer's call, provisionally.
 
-⚠️ **Phase 2 state**: `team.yml` is a reusable workflow (`on: workflow_call`). A consumer holds
+⚠️ **The consumer contract**: `team.yml` is a reusable workflow (`on: workflow_call`). A consumer holds
 the frozen stub (`templates/consumer-stub.yml`) plus a `.claude-team/` directory — `prompts/`
 overlays (`_shared.md` required) and an optional executable `setup.sh`. Inputs: `project_owner`,
-`project_number`, `allowed_bots`, `node`, `browser`. ⚠️ **Two pins move together**: the consumer's
+`project_number`, `allowed_bots`, `node`, `browser`, `runtimes`. ⚠️ **Two pins move together**: the consumer's
 `@ref` on the workflow, and `TEAM_REF` inside it (what the jobs fetch at run time) — release
-tooling owns keeping them equal. No production consumer is converted yet (brewdocs.beer is
-Phase 3).
+tooling owns keeping them equal.
 
 **Purpose.** A portable Claude/GitHub role team: the prompts each role runs on, the scripted
 hooks around them, and the handoff contract between them. Consumed by pointing a workflow at
