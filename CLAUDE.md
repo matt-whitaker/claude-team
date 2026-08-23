@@ -614,7 +614,7 @@ at all.)
 | Implementor | a task stamped `Role: implementor` | code, outside the design system |
 | Designer | a task stamped `Role: designer` | code, inside the design system |
 | Tester | a task stamped `Role: tester`, one per story | tests |
-| Writer | a task stamped `Role: writer`, one per story, run **first** | the product specification, then documentation |
+| Writer | a task stamped `Role: writer`, one per story, run **first** | the product specification, then human-facing documentation — **never** a `CLAUDE.md`, `AGENTS.md`, `.claude/**` or `.claude-team/**` |
 | Security | every merge, plus its handle on a PR | issues it files |
 
 ### The custodian's repair remit
@@ -809,6 +809,30 @@ rather than a claim they have to accept.
 ⚠️ **A failing test is a finding, not a chore.** It is filed on the authoring task, carried in
 the Tester's own report, and left failing. Weakening or deleting it to get green converts a
 finding into nothing, and a green suite that got there by deletion is worse than a red one.
+
+⚠️ **THE WRITER DOES NOT OWN THE AGENT INSTRUCTIONS, AND THIS FILE USED TO SAY IT DID.** Every
+`CLAUDE.md`, every `AGENTS.md`, everything under `.claude/` or `.claude-team/` — the role prompts
+included — is out of the Writer's scope, and out of every role's. It was a maintainer's decision
+to grant it and a maintainer's decision to reverse it.
+⚠️ **The reason is not tidiness.** Those files are the instructions the roles run on, the Writer's
+own among them. A role editing them rewrites its own operating rules and its peers', inside a
+story PR being reviewed for something else — so the change that governs every future run arrives
+as the least-examined part of the diff. Ordinary documentation is checked by whether it reads
+true; an instruction change is only checked by what it makes agents do next time, which nobody
+sees until it has already happened.
+⚠️ **A prohibition with no outlet turns a finding into silence**, so the Writer reports a stale or
+wrong instruction in its 🔔 Maintainer section with the file, what is wrong, and what it would
+change it to. A precise report is worth more than an unreviewed edit.
+⚠️ **It is pinned in BOTH places it was written**, the prompt and the workflow's job header.
+Correcting one and leaving the other saying the opposite is how the claim returns — the comment
+is what the next person editing that job reads.
+⚠️ **The original reason for splitting the Writer out survives the reversal**: `CLAUDE.md` was the
+single biggest source of merge conflicts because every role edited it. Nobody editing it is a
+stricter answer than one role editing it, so the conflict argument is satisfied either way.
+⚠️ **The prompt is the only enforcement today**, which by this file's own standard is the second
+line of defence and not the first. A deterministic guard — a run refusing to commit changes under
+those paths — is the structural version, and it collides with **this** repo, whose product *is*
+those files. That is filed rather than guessed at.
 
 ⚠️ **The Writer owns the product specification, and that is why it runs FIRST.** A
 specification is only worth anything if it says what the code *should* do, and it cannot say
