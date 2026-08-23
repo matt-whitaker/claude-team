@@ -134,6 +134,13 @@ on:
         description: Install and cache the Playwright chromium before author runs
         type: boolean
         default: false
+      runtimes:
+        description: >-
+          Comma-separated commands the authoring roles may run, so they can execute the
+          consumer's own gate. Each becomes a `Bash(<name>:*)` grant. Defaults to the Node
+          toolchain, which is what every consumer got before this input existed.
+        type: string
+        default: "npm,npx,node"
 
 env:
   NODE_VERSION: 22
@@ -1211,6 +1218,49 @@ jobs:
           echo "list=$list" >> "$GITHUB_OUTPUT"
           echo "roles for this run:${list:- none}"
 
+      # ⚠️ THE CONSUMER'S TOOLCHAIN IS THE CONSUMER'S TO NAME, and for a long time this file
+      # named it: every authoring role was granted `Bash(npm|npx|node:*)` and nothing else, so
+      # an author in a Python-gated repo could not run the gate at all. Measured on run
+      # 32561656056 — the Implementor reimplemented its assertion in `node` and reported, in the
+      # 🔔 Maintainer section, that it had not run the Python suite (#46). That is the ceiling of
+      # the constraint: a role producing a change it cannot verify.
+      #
+      # ⚠️ It broke this package's own stated invariant — *nothing here names a consuming repo,
+      # its branches, its gate or its packages*. A toolchain is the same category as a gate.
+      #
+      # ⚠️ SANITISED, NOT INTERPOLATED RAW. The value lands inside the quoted `--allowedTools`
+      # string, which is line-parsed by the action; an entry carrying a quote, a comma-escape or
+      # a newline could rewrite the flags after it. A consumer already controls its own caller
+      # workflow, so this is not a privilege boundary — it is what stops a typo silently
+      # widening the grant instead of failing.
+      #
+      # ⚠️ The default reproduces the old fixed list exactly, so no existing consumer changes
+      # behaviour by upgrading.
+      - id: runtimes
+        name: Resolve the authoring runtimes
+        env:
+          RUNTIMES: ${{ inputs.runtimes }}
+        run: |
+          grants=""
+          IFS=','
+          for name in $RUNTIMES; do
+            name=$(echo "$name" | tr -d '[:space:]')
+            [ -z "$name" ] && continue
+            case "$name" in
+              *[!a-z0-9_.-]*)
+                echo "::error::runtimes entry '$name' is not a bare command name — allowed: a-z 0-9 . _ -"
+                exit 1 ;;
+            esac
+            grants="$grants,Bash($name:*)"
+          done
+          unset IFS
+          if [ -z "$grants" ]; then
+            echo "::error::runtimes resolved to nothing; an author with no runtime cannot run any gate"
+            exit 1
+          fi
+          echo "grants=$grants" >> "$GITHUB_OUTPUT"
+          echo "authoring runtimes:$grants"
+
       # Install as workflow steps, not from inside a run: this costs Claude zero turns, and
       # without it `tsc` resolves to the runner image's global TypeScript (a different
       # major) and fails on config this repo pins as valid. The Writer is in this list too:
@@ -1379,7 +1429,7 @@ jobs:
           # sub-issue filing: a consumer cannot tell "nothing to report" from "forgot".
           claude_args: |
             --model opus
-            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
             --max-turns 80
             --json-schema '${{ steps.schema.outputs.body }}'
 
@@ -1452,7 +1502,7 @@ jobs:
           prompt: ${{ steps.p_designer.outputs.body }}
           claude_args: |
             --model opus
-            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
             --max-turns 80
             --json-schema '${{ steps.schema.outputs.body }}'
 
@@ -1522,9 +1572,14 @@ jobs:
           # render an empty fenced block and contradict the prompt, which sends the Tester to
           # the Handoff comments on the story's ISSUE instead.
           prompt: ${{ steps.p_tester.outputs.body }}
+          # ⚠️ THE TESTER GAINED `node` WHEN THE FOUR AUTHORS WERE UNIFIED ONTO ONE GRANT, and
+          # that is a stated widening rather than a side-effect. It previously held `npm`/`npx`
+          # and not `node`, with nothing anywhere saying why — and `npx` already executes node
+          # code, so the omission bounded nothing. Per-role runtime lists were the alternative
+          # and would have made a Python consumer configure four of them.
           claude_args: |
             --model sonnet
-            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*)"
+            --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
             --max-turns 80
             --json-schema '${{ steps.schema.outputs.body }}'
 
@@ -1603,7 +1658,7 @@ jobs:
           # input is maintainer-shaped issues — the trust level of every other authoring role.
           claude_args: |
             --model sonnet
-            --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh:*),Bash(npm:*),Bash(npx:*),Bash(node:*)"
+            --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
             --max-turns 80
             --json-schema '${{ steps.schema.outputs.body }}'
 
