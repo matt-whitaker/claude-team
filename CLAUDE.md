@@ -80,7 +80,6 @@ covering both, and it does not:
 |---|---|---|---|
 | **routing** | the front-door label, `@claude/<role>` | the maintainer; hooks stamp the trail | what should *happen* to this issue, and what has already run |
 | **classification** | `epic`, `spike`, `bug`, `task`, `story` | anyone filing; the custodial phase fills gaps | what this issue *is* |
-| **classification** | `epic`, `spike`, `bug`, `story` | anyone filing; a hook applies it after the Architect runs | what this issue *is* |
 
 A classification label is durable and derivable, so it survives a run and nothing has to
 re-derive it. ⚠️ **Every kind gets one, `story` included.** An earlier version left a story
