@@ -1,29 +1,12 @@
-# CLAUDE_CLOUD.md
+# CLAUDE_CLOUD.md — what is true about THIS repo
 
-**template-revision: 1** · **SETUP revision: 2**
+⚠️ **Everything portable moved to `claude-harness`.** The environment facts a cloud session needs —
+no `~/.claude/`, an ephemeral container, no `gh`, only attached repos reachable, the git traps that
+cost something — now live in `.claude/rules/claude-harness.md`, which loads automatically in every
+session here, cloud **and** local. This file is only what is true about *this repo*.
 
-⚠️ **Read this only if you are a Claude Code *cloud* session.** A local session already has all
-of it from the maintainer's memory and `~/.claude/`, and should stop here rather than spend
-context on it.
-
-You are a cloud session if any of these are set:
-
-```bash
-env | grep -E 'CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE|CLAUDE_CODE_CONTAINER_ID|CLAUDE_CODE_REMOTE_SESSION_ID'
-```
-
-This file exists because **nothing under `~/.claude/` reaches you** — no auto memory, no user
-`CLAUDE.md`, no personal skills. It is the durable substitute, and it is committed, so it is the
-only thing here that survives the container.
-
-## This environment
-
-- Repos live under `/home/user/`, not `~/Repositories/Claude/`.
-- **There is no `gh` CLI.** GitHub is reached through MCP tools.
-- The container is ephemeral. **Anything not committed and pushed is lost** — including
-  anything you learn.
-- Only the repos attached to the session are reachable. Another repo has to be attached before
-  you can read it, even to answer a question about it.
+⚠️ **Mention it in backticks, never as an unbackticked `@path`.** An `@path` in a `CLAUDE.md` is a
+real, unconditional import.
 
 ## How work ships here
 
@@ -71,43 +54,26 @@ parsed line by line.
 
 ## Lessons — append as you learn
 
-⚠️ **This section is your memory, and updating it is part of the work, not an errand.** A local
-session writes a durable lesson to its memory system; you write it here and commit it, or it
-dies with the container. Add the evidence — the run id, the measurement, what it cost — because
-a claim with no evidence gets edited away by whoever finds it inconvenient.
+⚠️ **A cloud session has no memory, so a lesson lives here or dies with the container.** Add the
+evidence — the run id, the measurement, what it cost — because a claim with no evidence gets edited
+away by whoever finds it inconvenient.
+
+⚠️ **If the lesson would be true in any repo it belongs in `claude-harness`, not here.** That is the
+rule that stops the layers mixing again, and it is easiest to break when writing something down in a
+hurry. Four git lessons were moved out of this file for exactly that reason.
 
 <!-- append entries here, newest last -->
 
-**Some work simply cannot be done from here, and knowing which saves a wasted attempt.** The
-GitHub MCP server has `get_label` but **no label write tool**; direct REST returns
-`403 GitHub access is not enabled for this session`; there is no `gh`. So label re-syncs
-(`ONBOARDING.md` §4) and board placement both need a local session. Say so and hand over the
-command rather than improvising — the board number is 9.
+**Label writes and board placement need a LOCAL session.** The general fact — the GitHub MCP server
+has `get_label` and no label write, and direct REST is refused — is in the harness rule. What is
+specific here: that makes `ONBOARDING.md` §4's label loop and board placement impossible from a
+cloud session. Say so and hand over the command rather than improvising. **The board is 9.**
 
-⚠️ **Never pipe `git push` into `tail` in a retry loop.** `out=$(git push ...); rc=$?` — piping
-makes `$?` the exit status of `tail`, so a failed push reports success and the loop breaks
-happily. Measured: a push that had actually been rejected was reported `PUSH_OK`.
+## Re-syncing
 
-⚠️ **A merged branch is deleted on the remote, and the stale local ref then breaks the next
-push.** `--force-with-lease` fails with `stale info` because `origin/<branch>` still points at the
-merged tip. `git remote prune origin`, then push plain — there is nothing to force.
+The harness rule carries its own `harness-rule-revision`; compare it against
+[`matt-whitaker/claude-harness`](https://github.com/matt-whitaker/claude-harness) and **replace the
+file** if it is behind. There is nothing to merge — none of it is this repo's.
 
-⚠️ **`git checkout <file>` discards every uncommitted change to it, not just the one you are
-undoing.** Cost: a finished README section, written and never committed, wiped while restoring a
-deliberately-injected typo. Commit before running destructive experiments; the container has no
-other copy.
-
-⚠️ **Prove a new test fails before trusting it.** A negative test that searched for a literal `—`
-where the file stores `\u2014` changed nothing, so a live assertion looked inert. A check verified
-only by "it passes" is a check you have not verified at all.
-
-## Re-syncing this file
-
-Compare **template-revision** above against `templates/CLAUDE_CLOUD.md` in
-`matt-whitaker/claude-code`, and **SETUP revision** against its `SETUP.md`.
-
-- Framing newer in the template → apply the changes above the repo-owned line. ⚠️ Merge, never
-  copy over: the fill-ins and the lessons are this repo's, not the template's.
-- SETUP.md newer → re-sync the facts per its Step 2, **including deleting** any that no longer
-  exist there.
-- Both current → say so and stop. Do not re-read either file to confirm what the numbers said.
+⚠️ This file has no revision and needs none. Everything in it is this repo's own, so nothing
+upstream can make it stale.

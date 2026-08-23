@@ -77,10 +77,23 @@ paragraph at all.
   same commit.
 - `RuleIds` in `tests/test_rules.py` fails on a citation that resolves to nothing.
 
-⚠️ **A cloud session should read `CLAUDE_CLOUD.md` first** — what a local session gets from
-memory and `~/.claude/`, which do not reach a cloud container at all. It is mentioned in backticks
-deliberately: an unbackticked `@path` is a real, unconditional import, and importing it would load
-cloud-only instructions into every local session.
+⚠️ **THE ENVIRONMENT FACTS ARE NOT THIS REPO'S ANY MORE.** How a Claude Code session works —
+that a cloud container is ephemeral and has no `~/.claude/`, that only attached repos are
+reachable, that piping `git push` into `tail` reports a rejected push as success — is
+[`claude-harness`](https://github.com/matt-whitaker/claude-harness), installed here as
+`.claude/rules/claude-harness.md`. It loads automatically, cloud **and** local, and it is
+**replaced** rather than merged when it moves.
+⚠️ **This repo owns the GitHub agents; the harness owns the session.** One question sorts them:
+who invoked it. A webhook is this repo's, a person opening a session is the harness's. Both
+installs are independent, and neither writes into the other's directory — `.claude/` is the
+harness's, `.claude-team/` is a consumer's.
+⚠️ **`CLAUDE_CLOUD.md` is what remains: facts about THIS repo** that a session needs and cannot
+derive — the board number, the hazards of a repo that runs the team workflow on itself, and the
+lessons a cloud session has nowhere else to put. ⚠️ It is mentioned in backticks deliberately: an
+unbackticked `@path` is a real, unconditional import.
+⚠️ **A lesson true in any repo goes upstream to the harness, not into that file.** Four git lessons
+lived there until the split; keeping them local made them invisible to every other repo that would
+have hit the same trap.
 
 ## The issue hierarchy
 
