@@ -38,6 +38,16 @@ unconditionally.
 role may do reaches nothing while an overlay still grants it. §0 says to grep for the old grant
 whenever an entry reports a narrowed scope.
 
+⚠️ **`rules/claude-team.md` is what a SESSION in a consumer repo knows.** The stub and the
+overlays tell a *workflow* how to run; neither tells a person's session what an epic is or where
+work goes, and claude-team's own `CLAUDE.md` is not in that clone. ⚠️ **It carries `team-ref`,
+which is the `uses:` pin recorded where a session reads it — not a second version number.** The
+pin is still the signal; this makes it legible from the clone, and a `team-ref` disagreeing with
+the stub is a half-done upgrade, the only part of one a clone can detect alone. ⚠️ **No role
+instruction goes in it** — a role is given `prompts/` at run time, and a rule scopes by file path,
+never by who is running. ⚠️ Its hierarchy table is asserted equal to this file's, because a third
+statement of the same facts is a third thing that drifts.
+
 ⚠️ **The consumer contract**: `team.yml` is a reusable workflow (`on: workflow_call`). A consumer
 holds the frozen stub (`templates/consumer-stub.yml`) plus a `.claude-team/` directory — `prompts/`
 overlays (`_shared.md` required) and an optional executable `setup.sh`. Inputs: `project_owner`,
