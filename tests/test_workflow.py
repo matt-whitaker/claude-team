@@ -458,6 +458,19 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
         self.assertIn("git show vN:templates/consumer-stub.yml", release)
         self.assertIn("@mainline", release)
 
+    def test_the_release_is_two_commits_and_the_roll_merges_FIRST(self):
+        """⚠️ THE TWO HALVES HAVE OPPOSITE REQUIREMENTS. The changelog roll belongs on mainline;
+        the pin flip must never reach it. Bundled into one commit — as this procedure used to say
+        — the roll inherits the constraint it does not have, so no `## vN` heading ever lands on
+        the default branch and the next roll sweeps two releases under one heading. Order is the
+        other half: rolling first is what puts the heading on the tag as well as the branch."""
+        release = self.CLAUDEMD[self.CLAUDEMD.index("**Releasing**"):]
+        release = release[:release.index("## Working in this repo")]
+        roll, pins = release.index("The changelog roll"), release.index("The pin flip")
+        self.assertLess(roll, pins, "the changelog roll must be step 1")
+        self.assertIn("MERGES", release[roll:pins])
+        self.assertIn("NEVER merged", release[pins:])
+
 
 class TheEmptyHandoffKeepsItsEvidence(unittest.TestCase):
     """⚠️ #32, second half. A role step that succeeds and returns no handoff silently halts a

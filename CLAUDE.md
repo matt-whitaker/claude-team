@@ -9,11 +9,33 @@ scripted `team` stub (Python resolves imports from the script's own directory be
 imports the pure text helpers from the *real* `team.py` so they cannot drift, and runs every git-touching case against real repositories — including
 deliberately stale refs.
 
-⚠️ **Releasing**: check out mainline, rename `CHANGELOG.md`'s `## Unreleased` heading to `## vN`
-and open a fresh empty one above it, flip every pin (`TEAM_REF`, the in-workflow `@refs`,
-`load-prompt`'s default, the stub template) from `mainline` to `vN` in one commit, run the suite
-(`ReleasePins` asserts the agreement), tag that commit `vN`, push the tag, and **do not merge the
-release commit** — mainline keeps its canary pins. Consumers pin `@vN`; a repo whose job is to
+⚠️ **Releasing**: TWO COMMITS, and which one merges is the whole point. They have opposite
+requirements, so bundling them makes the harmless half inherit the dangerous half's constraint:
+
+1. **The changelog roll — an ordinary PR that MERGES.** Rename `CHANGELOG.md`'s `## Unreleased`
+   heading to `## vN` and open a fresh empty one above it. Nothing about this needs to be off
+   mainline.
+2. **The pin flip — a commit on top of that mainline, tagged, NEVER merged.** Flip every pin
+   (`TEAM_REF`, the in-workflow `@refs`, `load-prompt`'s default, the stub template) from
+   `mainline` to `vN`, run the suite (`ReleasePins` asserts the agreement), tag that commit `vN`
+   and push the tag. Mainline keeps its canary pins.
+
+⚠️ **Rolling FIRST is what puts the heading on both.** The tag is cut from a mainline that already
+carries `## vN`, so the artifact a consumer reads is correct, and so is the branch. Rolling
+afterwards instead would tag a tree whose own changelog says `## Unreleased`.
+
+⚠️ **Bundled, the roll never reached mainline at all** — it lived only on a commit that by
+definition does not merge. `## v1` and `## v1.1` are on the default branch only because
+`CHANGELOG.md` was written retrospectively, after both tags existed; the procedure has never
+produced a heading there. Left running, mainline's `## Unreleased` accumulates every shipped
+version and the next roll sweeps two releases under one heading — telling a consumer to redo
+actions they already took.
+
+⚠️ **Step 2 needs no branch**, only a commit that is not on mainline; a detached HEAD tags fine. A
+branch is worth pushing solely when the tag must be cut by someone else, since a tag cannot name a
+commit the remote does not have.
+
+Consumers pin `@vN`; a repo whose job is to
 exercise the engine tracks `@mainline` instead — brewdocs.beer as the canary, `claude-team-example`
 as the drill target, and this repo's own stub, which `SelfInstall` pins there permanently.
 brewdocs.beer-kb also tracks `@mainline`, by the maintainer's call rather than by the rule.
