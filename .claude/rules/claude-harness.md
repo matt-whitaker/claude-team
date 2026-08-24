@@ -1,6 +1,6 @@
 # claude-harness
 
-**harness-rule-revision: 8** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 11** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -71,6 +71,11 @@ confirmation rather than the trigger.
   and verified gets stated plainly without hedging. ⚠️ **What could not be determined is the part
   that matters most** — say it before it becomes a surprise. A message telling someone not to look
   further is the most expensive thing you can write.
+- **State facts as they are now, without historical qualifiers.** No "as predicted", no "the same
+  shape as", no callbacks to past failures as justification, no defending a choice that was not
+  questioned. Reasoning appears where a decision is being made and the reason changes it;
+  everywhere else, the current state stands on its own. This governs replies, PR bodies and
+  commit messages — not a repo's own documented file conventions.
 - **A defect found out of scope is filed, never swept into the current change.** Scope grows by
   surfacing follow-ups.
 
@@ -90,6 +95,12 @@ confirmation rather than the trigger.
 - **Count-assert every scripted find-and-replace.** An unasserted replace silently matches nothing
   and prints success.
 - **Fetch before trusting local git state** in a long session.
+- **Idle on the default branch; branch from `origin/<default>`, never from HEAD.** A session left
+  where its last task ended bases the next change there, so unmerged work silently becomes the base
+  of something unrelated. A detached HEAD does it more quietly still — `git branch --show-current`
+  prints nothing rather than a wrong answer. ⚠️ **No conflict with the arrival pin above**: that
+  governs where work goes while a task is in flight, this governs where you wait and what you cut
+  from.
 - **`value or default` swallows the empty case** — empty dict, empty list, `0`, `""`. When empty
   is what you are testing, use a sentinel.
 
@@ -119,6 +130,32 @@ read.
 ⚠️ **The split is by whose behaviour a fact describes.** A fact about *the session* is this file's,
 even while working on the team. A fact about *the team* is the team's, even though a session is
 what reads it.
+
+### Driving a story
+
+The maintainer can hand a session a whole story — *"take on this story"* — and the session becomes
+the team's driver: it does what the cascade would, with judgment between runs. The team defines
+what the backlog does; this section is only how the session conducts itself while driving.
+
+- **The go-signal is standing authorization, bounded.** It covers label adds and progress comments
+  on that story's issues until the story is done or blocked. Anything outward beyond that —
+  merging, closing, editing bodies, touching other stories — asks first.
+- ⚠️ **One driver per repo. Check before taking the wheel**: a stub that names a bot in
+  `allowed_bots` has a live cascade, and driving beside it races it for the same labels. Only
+  drive dark repos, and say so if asked to drive a lit one.
+- **The loop is reconcile → act → park → wake.** Reconcile against remote state before *every*
+  action, never from memory of state. Act by the story's own sequencing contract, read from the
+  issue at that moment — the team's files say how it works; do not carry a summary. Then park a
+  blocking watcher (`gh run watch <id>` in the background) rather than polling on a cadence, and
+  reconcile again on wake before acting.
+- ⚠️ **Post the state at every transition, on the story issue.** A driving session is a single
+  process that can die silently — the exact dark-cascade failure the team documents. What makes
+  that survivable is that recovery never needs the session's memory: a fresh session reads the
+  story and continues. If the last posted state is stale, that IS the diagnostic.
+- **The endgame is verified, not assumed.** After the last task closes, confirm the story's PR
+  exists and says what landed; a missing PR is a diagnosis to run, never a silence to leave.
+- ⚠️ **A driver never edits its own law mid-story.** Rules, skills, hooks, prompts — proposing a
+  change is fine; landing one while driving under it is not.
 
 ## If you suspect this file did not load
 
