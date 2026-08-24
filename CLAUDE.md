@@ -9,29 +9,17 @@ scripted `team` stub (Python resolves imports from the script's own directory be
 imports the pure text helpers from the *real* `team.py` so they cannot drift, and runs every git-touching case against real repositories — including
 deliberately stale refs.
 
-⚠️ **Releasing**: check out mainline, rename `CHANGELOG.md`'s `## Unreleased` heading to `## vN`
-and open a fresh empty one above it, flip every pin (`TEAM_REF`, the in-workflow `@refs`,
-`load-prompt`'s default, the stub template) from `mainline` to `vN` in one commit, run the suite
-(`ReleasePins` asserts the agreement), tag that commit `vN`, push the tag, and **do not merge the
-release commit** — mainline keeps its canary pins. Consumers pin `@vN`; a repo whose job is to
-exercise the engine tracks `@mainline` instead — brewdocs.beer as the canary, `claude-team-example`
-as the drill target, and this repo's own stub, which `SelfInstall` pins there permanently.
-brewdocs.beer-kb also tracks `@mainline`, by the maintainer's call rather than by the rule.
+⚠️ **RELEASING IS THE MAINTAINER'S, AND NO SESSION DOES ANY PART OF IT.** Never tag, never flip a
+pin from `mainline` to a `vN`, never cut or merge a release commit. Say a release looks warranted,
+say what is in `## Unreleased` that a consumer would want, and stop. ⚠️ It is not a permissions
+gap to work around: a cloud session cannot push a tag at all, so the half it *can* do — a commit
+with the pins flipped — is the half that is dangerous on its own.
 
-⚠️ **THE SUITE CANNOT SEE WHICH COMMIT GOT TAGGED, so the release ends with a check on the tag
-itself.** `ReleasePins` asserts the four pins agree with *each other* — on mainline they all read
-`mainline`, so it is green on exactly the tree a mis-cut tag ships. Nothing else looks either. The
-stub is the consumer's own pin, which makes it the sharpest single probe:
-
-```bash
-git show vN:templates/consumer-stub.yml | grep 'team.yml@'   # must print @vN, never @mainline
-```
-
-⚠️ **The plausible mis-cut is tagging the default branch's head.** The release commit is
-deliberately not on any branch, so every tool that defaults to a branch — the GitHub Releases page
-included — targets the wrong commit while looking exactly right. What ships is a `vN` whose jobs
-fetch every hook and prompt from `mainline` at run time and a stub telling the consumer to pin
-`@mainline`: pinning that pins nothing.
+⚠️ **Consumers pin `@vN`**; a repo whose job is to exercise the engine tracks `@mainline` instead —
+brewdocs.beer as the canary, `claude-team-example` as the drill target, and this repo's own stub,
+which `SelfInstall` pins there permanently. brewdocs.beer-kb also tracks `@mainline`, by the
+maintainer's call rather than by the rule. ⚠️ **A `vN` appearing anywhere on `mainline` is a
+defect** — the default branch is what the canaries run, so a pin flipped there stops it being one.
 
 ⚠️ **A release is not finished when the tag is pushed.** `ONBOARDING.md` §0 is the returning
 consumer's path and `CHANGELOG.md` is what makes it answerable. A consumer has one question — *must
