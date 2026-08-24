@@ -393,6 +393,30 @@ one.
 
 > Evidence: the front/back split for `branch-navigation.py` is gone; it is one hook at every site.
 
+### E20 — A limit checked after the cost cannot prevent it. It can only destroy the result.
+
+`--max-turns 80` reads as a budget and bounds nothing: runs of 95 and 99 turns are on record, and
+what the number actually does is fail a result the model had already **completed** — discarding
+finished, committed work after it was paid for. The spend happened either way; the only thing the
+check could still reach was the deliverable.
+
+⚠️ **Find the layer that actually binds before trusting a number.** Here it is `timeout-minutes`,
+which the platform enforces — and five of six model jobs had none, so the ceiling everyone assumed
+was 80 turns was in fact six hours. A control nobody has tested against its own limit is a claim,
+not a bound.
+
+⚠️ **The price, stated:** raising the threshold removes the only line that ever announced a long
+run. That is the correct trade, because the announcement arrived as a failure on work that had
+succeeded — but it means nothing now reports a run that goes long, and the ceiling is the only
+thing that will stop one.
+
+⚠️ **The wrong fix is deleting the flag.** Nothing would then be exceeded, and if the unwired-SDK
+path (`claude-code-action#1177`, reporting `maxTurns` defaulting to 10) ever becomes true for
+`claude_args`, every author run silently truncates at 10 turns instead.
+
+> Evidence: #1 · two incidents, 154 insertions recovered by hand from a capture branch ·
+> `TheTurnCapIsADiscardThresholdNotABudget` in `tests/test_workflow.py`.
+
 ---
 
 ## Rules for writing rules

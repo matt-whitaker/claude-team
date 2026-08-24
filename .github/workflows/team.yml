@@ -114,6 +114,25 @@ name: Claude
 # and secret masking covers logs only — not an API payload a model could write — so it
 # stays out of any environment a prompt can read. Step env is per-step, which is what makes
 # these two safe: the model step in the same job cannot see it.
+# ⚠️ `--max-turns` IS A DISCARD THRESHOLD, NOT A BUDGET, AND RAISING IT COSTS NOTHING.
+# Nothing enforces it: runs of 95 and 99 turns against a cap of 80 are on record, and the action
+# then FAILS a result the model had already completed — throwing finished, committed work away
+# after it was paid for (#1). The numbers sit far above any observed run so a completed result is
+# never discarded. `timeout-minutes` on the job is the ceiling that actually binds, which is why
+# every model job carries one; without it a hung call burns the 6-hour default.
+#
+# ⚠️ A CEILING IS NOT FREE, so it is 4x the longest healthy run rather than close to it. Timing a
+# job out kills its POST-hooks too — the landing, the handoff, the findings — so a ceiling tight
+# enough to cut a slow-but-working run destroys exactly what that run produced. Asserted.
+#
+# ⚠️ ONE NUMBER FOR EVERY MODEL JOB, because ~15 minutes is the only healthy-run figure this
+# package has actually measured, and it was measured on `authors` — the longest role. A per-job
+# ceiling would be nine guesses dressed as precision. Measure a role, then tighten its own.
+#
+# ⚠️ A RUN THAT STOPS AT EXACTLY 10 TURNS means the cap has begun binding through the SDK path
+# instead (claude-code-action#1177, which reports `maxTurns` defaulting to 10 when unwired). Both
+# halves above change meaning at once if that happens, so treat it as a signal, not a flake.
+#
 # ⚠️ TRIGGERS, run-name AND concurrency LIVE IN THE CONSUMER'S STUB — a reusable workflow's own
 # run-name is ignored and its workflow-level concurrency is unsupported; see templates/.
 on:
@@ -180,6 +199,7 @@ jobs:
         (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       # write so the unroutable path can leave a comment rather than skipping silently
@@ -326,6 +346,11 @@ jobs:
           prompt: ${{ steps.route-prompt.outputs.body }}
           # Reads the issue and answers. No Write/Edit: it must not "helpfully" add the missing
           # `Role:` stamp — a route that rewrote its own input would leave nothing to notice.
+          # ⚠️ THE ONE CAP LEFT LOW, AND IT IS CONTAINMENT RATHER THAN A BUDGET. Every other role's
+          # result is a deliverable, so discarding it loses the run; this step is
+          # `continue-on-error` with a documented fallback, so a discarded answer degrades to the
+          # script's own route with its notice intact. A routing call needing 15 turns has already
+          # failed at the thing it was asked to do.
           claude_args: |
             --model sonnet
             --allowedTools "Read,Glob,Grep,Bash(gh:*)"
@@ -504,6 +529,7 @@ jobs:
         || (!github.event.issue.pull_request && contains(github.event.comment.body, '@claude/architect'))
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       # write purely to push the epic's (empty) integration branch — the prompt
       # forbids committing to it; this role writes no code
@@ -584,7 +610,7 @@ jobs:
           claude_args: |
             --model sonnet
             --allowedTools "Read,Edit,Write,Bash(gh:*),Bash(git:*)"
-            --max-turns 100
+            --max-turns 150
 
       # ⚠️ FIRST of the post-hooks, and the reason branch creation is no longer the model's.
       # The action mints its branch LOCALLY and never pushes one with no commits — and an
@@ -711,6 +737,7 @@ jobs:
       always() && needs.delegate.result != 'skipped'
       && contains(needs.delegate.outputs.roles, 'claude')
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       # reads to answer, writes only its own reply. No branch, no code.
       contents: write
@@ -821,7 +848,7 @@ jobs:
             --model sonnet
             --allowedTools "Read,Glob,Grep,Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr diff:*),Bash(gh run view:*),Bash(gh run list:*),Bash(gh label list:*),Bash(git:*)"
             --json-schema '${{ steps.repairs-schema.outputs.body }}'
-            --max-turns 40
+            --max-turns 150
 
       # ⚠️ THE MODEL PROPOSES, THIS DISPOSES. Deterministic at both ends, the same shape as
       # post-handoff/post-findings: the schema forces the report, this forces delivery — and here
@@ -874,6 +901,7 @@ jobs:
         || (!github.event.issue.pull_request && contains(github.event.comment.body, '@claude/researcher'))
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       # ⚠️ contents READ, unlike every authoring role and unlike the Architect. A spike ships
       # nothing and has no branch to cut.
@@ -1013,7 +1041,7 @@ jobs:
             --model sonnet
             --allowedTools "Read,WebSearch,WebFetch"
             --json-schema '${{ steps.findings-schema.outputs.body }}'
-            --max-turns 80
+            --max-turns 150
 
       # ⚠️ THE ONLY WAY THE FINDINGS REACH ANYONE. The role has no shell, so it cannot run `gh`
       # and cannot write its own results anywhere. Deterministic at both ends, the same shape as
@@ -1314,7 +1342,7 @@ jobs:
       # authors need is the consumer's `.claude-team/setup.sh`.
       - name: Consumer setup
         if: contains(steps.roles.outputs.list, 'implementor') || contains(steps.roles.outputs.list, 'designer') || contains(steps.roles.outputs.list, 'tester') || contains(steps.roles.outputs.list, 'writer')
-        timeout-minutes: 15
+        timeout-minutes: 20
         run: |
           if [ -x .claude-team/setup.sh ]; then
             .claude-team/setup.sh
@@ -1435,7 +1463,7 @@ jobs:
           claude_args: |
             --model opus
             --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
-            --max-turns 80
+            --max-turns 150
             --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Designer ──
@@ -1508,7 +1536,7 @@ jobs:
           claude_args: |
             --model opus
             --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
-            --max-turns 80
+            --max-turns 150
             --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Tester ──
@@ -1585,7 +1613,7 @@ jobs:
           claude_args: |
             --model sonnet
             --allowedTools "Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
-            --max-turns 80
+            --max-turns 150
             --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Writer ──
@@ -1675,7 +1703,7 @@ jobs:
           claude_args: |
             --model sonnet
             --allowedTools "Read,Edit,Write,Bash(git:*),Bash(gh:*)${{ steps.runtimes.outputs.grants }}"
-            --max-turns 80
+            --max-turns 150
             --json-schema '${{ steps.schema.outputs.body }}'
 
       # ── Once, for the job ──
@@ -1901,6 +1929,7 @@ jobs:
            ))
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       # ⚠️ write, not read: the on-demand path's whole contract is that a requested review
@@ -1981,7 +2010,7 @@ jobs:
           claude_args: |
             --model sonnet
             --allowedTools "Read,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh issue create:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh repo view:*),Bash(gh project item-add:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git status:*),Bash(git rev-parse:*),Bash(git ls-files:*),Bash(git blame:*),Bash(npm audit:*)"
-            --max-turns 40
+            --max-turns 150
 
       # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
       # `always()` so a FAILED run still yields its transcript, which is when you most want one.

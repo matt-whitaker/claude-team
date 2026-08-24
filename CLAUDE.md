@@ -1114,6 +1114,22 @@ An issue that removes a role's permission to stop converts a cheap, informative 
 expensive, opaque one — measured across five runs on one story, where the first three reported
 precisely what blocked them in 1–4 minutes and the last two ground to the cap with nothing.
 
+⚠️ [E20] **"THE CAP" IN THE PARAGRAPHS ABOVE IS A DISCARD THRESHOLD, NOT A BUDGET.** Nothing
+enforces `--max-turns`: runs of 95 and 99 turns against a cap of 80 are on record. What the number
+does is fail a result the model had already **completed**, throwing away finished, committed work
+after it was paid for — so the check reached the deliverable and never the spend. Every
+deliverable-producing role now sits at 150, far above any observed run; raising it costs nothing,
+because it was bounding nothing.
+⚠️ **`timeout-minutes` on the job is the ceiling that actually binds**, and five of the six model
+jobs carried none — so the real ceiling was GitHub's six-hour default while the visible number said
+80. Every model job carries one now, asserted in the suite.
+⚠️ **`route` keeps its low cap of 15, and that is containment rather than a budget.** Its step is
+`continue-on-error` with a documented fallback to the script's own route, so a discarded answer
+degrades rather than losing the run — the one place where throwing a result away is cheap.
+⚠️ **A run that stops at exactly 10 turns is the signal to re-read all of this**: it means the cap
+has begun binding through the SDK path instead (`claude-code-action#1177`), and both halves change
+meaning at once.
+
 ⚠️ [E15] **AND THE THIRD SHAPE IS GATHERING WITHOUT PRODUCING, which neither of the other two catches.**
 Stopping early is a plan with unticked boxes; stopping late is grinding on one obstacle. This is
 neither: every turn succeeds, every turn yields something genuinely new, and the deliverable is

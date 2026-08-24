@@ -58,6 +58,18 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 - **Story PRs and landings report their failures.** `open-story-pr.py` now says what `gh` refused
   and names the two usual causes; `finish-pr.py` no longer reports landed work as stranded. No
   action — but if you have been opening story PRs by hand, the next failure will tell you why.
+- **⚠️ A finished run is no longer thrown away for exceeding its turn cap.** `--max-turns` bounds
+  nothing — runs of 95 and 99 turns against a cap of 80 are on record — so the only thing it did
+  was fail a result the model had already completed, discarding committed work after it was paid
+  for. Every deliverable-producing role now sits at 150. No action, and **no extra spend**: the
+  number was never a budget. Expect work that used to arrive via a `failure/*` capture branch to
+  land normally instead.
+- **⚠️ Every model job now carries a 60-minute `timeout-minutes` ceiling**, where five of six
+  previously had none and ran under GitHub's six-hour default. This is the limit that actually
+  binds now that the turn cap does not. No action, but **a job that hangs is now cut at an hour
+  rather than at six** — and if a role in your repo legitimately runs longer than an hour, say so
+  before upgrading, because a timed-out job loses its post-hooks and with them whatever it
+  produced.
 
 ## v1.1
 

@@ -672,3 +672,98 @@ class CanonicalLabels(unittest.TestCase):
             re.search(r"(?i)\bits own\b[^.]*\bPR\b", desc),
             "the task description claims a task has its own PR; the story level owns it")
 
+
+
+def claude_args_blocks(text):
+    """Every `claude_args: |` literal block, as its raw content lines.
+
+    ⚠️ Text-walked rather than parsed: the suite is stdlib only, and the trap being asserted is a
+    property of the RAW block anyway — a YAML parser would happily hand back the leaked comment as
+    a string and tell you nothing was wrong.
+    """
+    out, buf, indent = [], None, ""
+    for line in text.splitlines():
+        if buf is not None:
+            if not line.strip() or line.startswith(indent):
+                buf.append(line)
+                continue
+            out.append(buf)
+            buf = None
+        m = re.match(r"^(\s+)claude_args: \|\s*$", line)
+        if m:
+            indent = m.group(1) + " "
+            buf = []
+    if buf is not None:
+        out.append(buf)
+    assert out, "no claude_args blocks found"
+    return out
+
+
+def model_jobs(text):
+    """Jobs that call the host action — derived, never enumerated.
+
+    A list would go stale the first time a role is added, which is this package's own rule for
+    anything a hook or a test keys on.
+    """
+    names = [m.group(1) for m in re.finditer(r"^  ([a-z][a-z_]*):$", text, re.M)]
+    found = [n for n in names if "anthropics/claude-code-action" in job_block(text, n)]
+    assert found, "no model jobs found"
+    return found
+
+
+class TheTurnCapIsADiscardThresholdNotABudget(unittest.TestCase):
+    """⚠️ #1: NOTHING ENFORCES `--max-turns`. Runs of 95 and 99 turns against a cap of 80 are on
+    record, and the action then FAILS a result the model had already completed — discarding
+    finished, committed work after it was paid for. Raising the number costs nothing, because the
+    number was never bounding spend; it only decides whether a finished result is thrown away."""
+
+    OBSERVED = 99   # the highest turn count on record, brewdocs.beer#1159
+    HEALTHY = 15    # minutes; the longest healthy run observed, per the authors job
+
+    def test_every_deliverable_role_sits_above_the_observed_ceiling(self):
+        """A cap at or below a real run's turn count discards that run's work."""
+        checked = 0
+        for job in model_jobs(TEAM):
+            if job == "delegate":
+                continue  # containment, asserted separately below
+            for cap in re.findall(r"--max-turns (\d+)", job_block(TEAM, job)):
+                checked += 1
+                self.assertGreater(
+                    int(cap), self.OBSERVED,
+                    f"{job}'s cap of {cap} would discard a completed run of {self.OBSERVED} turns")
+        self.assertEqual(checked, 8, "expected 8 deliverable-producing caps")
+
+    def test_route_is_the_only_cap_left_low_and_says_why(self):
+        """⚠️ Its result is DESIGNED to be discardable — `continue-on-error` plus a documented
+        fallback to the script's own route — so a low threshold there is containment. Every other
+        role's result is the run's deliverable."""
+        low = [c for c in re.findall(r"--max-turns (\d+)", TEAM) if int(c) <= self.OBSERVED]
+        self.assertEqual(low, ["15"], "a second low cap appeared; it would discard finished work")
+        self.assertIn("THE ONE CAP LEFT LOW", TEAM)
+        self.assertIn("continue-on-error", job_block(TEAM, "delegate"))
+
+    def test_every_model_job_carries_the_ceiling_that_actually_binds(self):
+        """⚠️ With turns unenforced, `timeout-minutes` is the ONLY thing bounding a run. Five model
+        jobs had none, so the recommendation on #1 — "the ceiling that actually binds is
+        timeout-minutes on the job" — was true of `authors` and nothing else."""
+        for job in model_jobs(TEAM):
+            with self.subTest(job=job):
+                found = re.findall(r"^    timeout-minutes: (\d+)$", job_block(TEAM, job), re.M)
+                self.assertEqual(len(found), 1,
+                                 f"{job} has no job-level ceiling; it defaults to 360 minutes")
+                self.assertLess(int(found[0]), 360,
+                                f"{job}'s ceiling is no tighter than the default")
+                self.assertGreaterEqual(
+                    int(found[0]), 4 * self.HEALTHY,
+                    f"{job}'s ceiling is under 4x the longest healthy run; a cut job loses its "
+                    f"POST-hooks, and with them whatever the run produced")
+
+    def test_no_comment_leaks_into_a_claude_args_block(self):
+        """⚠️ `claude_args: |` IS A LITERAL BLOCK SCALAR, SO `#` IS CONTENT, NOT A COMMENT — the
+        line reaches the CLI as an argument, because the argument list is parsed line by line.
+        A comment about a flag belongs above the block, where `#` means what it looks like."""
+        for block in claude_args_blocks(TEAM):
+            for line in block:
+                self.assertFalse(
+                    line.lstrip().startswith("#"),
+                    f"a comment leaked into a claude_args block and becomes an argument: {line!r}")
