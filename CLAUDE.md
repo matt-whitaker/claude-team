@@ -81,9 +81,8 @@ paragraph at all.
 `claude-harness.md`, from [`claude-harness`](https://github.com/matt-whitaker/claude-harness) — how
 a Claude Code session works in any repo, discovered automatically in every session here, cloud and
 local. It is **replaced** to upgrade, never merged, and nothing of this repo's is written into it.
-⚠️ **`ls .claude/rules/` is the manifest of what is installed**, which only means anything while
-every entry came from somewhere else. What is true about *this* repo goes in this file.
-⚠️ **Nothing copies a `CLAUDE.md` during any install**, which is what makes the division checkable:
+⚠️ **`ls .claude/rules/` is the manifest of what is installed.** What is true about *this* repo
+goes in this file. Nothing copies a `CLAUDE.md` during an install, so the division is checkable:
 a file that arrived from an install is a rule, a file nobody installed is this one.
 
 ⚠️ **This repo owns the GitHub agents; the harness owns the session.** One question sorts them:
@@ -91,8 +90,8 @@ who invoked it. A webhook is this repo's, a person opening a session is the harn
 installs are independent, and neither writes into the other's directory — `.claude/` is the
 harness's, `.claude-team/` is a consumer's.
 
-⚠️ **A lesson true in any repo goes upstream to the harness, not here.** Keeping one local makes it
-invisible to every other repo that would hit the same trap.
+⚠️ **A lesson true in any repo goes upstream to the harness, not here.** Keeping one local makes
+it invisible to every other repo that would hit the same trap.
 
 ## Working in this repo
 
@@ -111,8 +110,8 @@ gesture alone.
 on a branch changes nothing about the run editing them. Merging changes the machinery for this
 repo, `claude-team-example`, and every consumer tracking mainline at once.
 
-⚠️ **This file is the specification.** There is no product spec; the Tester derives intent from it,
-so editing it is a change to the contract rather than to prose.
+⚠️ **This file is the specification.** There is no product spec; the Tester derives intent from
+it, so editing it changes the contract.
 
 ⚠️ **A schema injected into a workflow step must contain no single quote** and must stay on one
 line — `--json-schema` takes inline JSON wrapped in single quotes, and the argument list is parsed

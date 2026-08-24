@@ -1,6 +1,6 @@
 # claude-harness
 
-**harness-rule-revision: 4** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 5** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -56,7 +56,7 @@ confirmation rather than the trigger.
 - **A merged branch is deleted remotely,** and the stale local ref then breaks the next push —
   `--force-with-lease` fails `stale info`. `git remote prune origin`, then push plain.
 - **`git checkout <file>` discards every uncommitted change to it,** not only the one being
-  undone. Cost: a finished section wiped while reverting a one-character typo.
+  undone. Commit before running a destructive experiment.
 - **Prove a new test fails first,** against the unfixed code, for the reason you expect. A check
   verified only by passing is not verified.
 - **`value or default` swallows the empty case** — empty dict, empty list, `0`, `""`. When empty
@@ -64,15 +64,15 @@ confirmation rather than the trigger.
 
 ## Writing an instruction file
 
-⚠️ **State the fact. Do not narrate the change that produced it.** A `CLAUDE.md`, a rule, an
-`AGENTS.md` — when it says something, that is simply what is true now. "…any more", "this used to
-say the opposite", "moved here when X was split out" is lore: it dates the file, invites a reader to
-reconstruct a history that does not affect what they should do, and gives a later edit two things to
-keep consistent instead of one.
+⚠️ **Read an instruction file in good faith.** Its facts were written accurately; they need no
+evidence attached to be trusted, and asking for it is what fills a file with things nobody acts on.
 
-⚠️ **The change belongs in the commit and the PR, where it is already recorded and where someone
-looking for it will look.** If a *why* genuinely changes behaviour — a constraint, a trap, a reason
-the obvious thing is wrong — that is a fact in its own right, so write it as one.
+⚠️ **State the fact. Do not narrate the change that produced it.** Cut "…any more", "this used to
+say the opposite", "measured on run N", and the issue number that prompted the line. The change is
+in the commit and the PR.
+
+⚠️ **A *why* that changes what you do is a fact, and stays** — a constraint, a trap, a reason the
+obvious thing is wrong. A *why* that only argues the line deserves to be there is the kind to cut.
 
 ## claude-team, if this repo has it
 
@@ -82,8 +82,8 @@ failure, repair what the custodian could not, trigger a workflow, open a PR to m
 Do that.
 
 ⚠️ **Read how it behaves from `claude-team` itself** — its `CLAUDE.md`, `ONBOARDING.md` and its
-prompts are the source. Nothing here summarises them, and nothing here should: a copy drifts, and
-the copy is what gets read.
+prompts are the source. Nothing here summarises them: a copy drifts, and the copy is what gets
+read.
 
 ⚠️ **The split is by whose behaviour a fact describes.** A fact about *the session* is this file's,
 even while working on the team. A fact about *the team* is the team's, even though a session is
@@ -98,7 +98,7 @@ An `InstructionsLoaded` hook logs every instruction file and why it loaded. ⚠�
 `~/.claude/settings.json`.** A hook in a project's `.claude/settings.json` does **not** run in a
 folder whose workspace-trust dialog has not been accepted, and a `-p` session never counts as
 accepting it — so a project-scoped hook that silently never fires reads exactly like a rule that
-never loaded. Setup for it is in `claude-harness`'s `SETUP.md`.
+never loaded. Setup is in `claude-harness`'s `SETUP.md`.
 
 ⚠️ **Compaction is not the explanation.** These files reload after a `/compact` — `compact` is one
 of the hook's own `load_reason` values.
@@ -107,5 +107,5 @@ of the hook's own `load_reason` values.
 
 A local session writes it to memory. A cloud session **commits it to this repo's `CLAUDE.md`** —
 not to a rule, which is for what was installed. ⚠️ **If the lesson would be true in any repo it
-belongs upstream in `claude-harness`, not here** — that is the rule that stops the layers mixing
-again, and it is easiest to break when writing something down in a hurry.
+belongs upstream in `claude-harness`, not here.** Keeping one local makes it invisible to every
+other repo that would hit the same trap.
