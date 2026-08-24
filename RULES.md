@@ -1,28 +1,27 @@
 # The engine rules
 
-`CLAUDE.md` records what went wrong and what was done about it. This file names the rules those
-records are instances of, so the next one can cite a rule instead of deriving it again.
-
-**Why this exists.** The record counts its own repetitions — *"the fifth instance of this exact
-shape"*, *"the sixth dead channel"*, *"this trap survived being documented and was written again
-anyway, twice"*. A rule discovered six times is a rule that was never named. Naming it is the
-cheapest thing that stops a seventh.
+`CLAUDE.md` says how this package works. This file names the design rules behind it, so a change
+can cite one instead of deriving it again.
 
 **How to use it.**
 
-- A ⚠️ paragraph in `CLAUDE.md` may open with its rule id — `⚠️ [E4] **…**` — naming the rule the
-  failure is an instance of. Tag as you go: a paragraph picks up its id when someone next edits it.
-  There is no sweep, and an untagged paragraph is not a defect.
+- A ⚠️ paragraph in `CLAUDE.md` may open with its rule id — `⚠️ [E4] **…**` — naming the rule it is
+  an instance of. Tag as you go; an untagged paragraph is not a defect.
 - A **new** ⚠️ paragraph should cite a rule or say plainly that it is a new one. If it is new, add
   it here in the same commit.
 - Citing an id that does not exist here fails the suite (`RuleIds` in `tests/test_rules.py`).
-- These ids are stable. A rule that turns out to be wrong is **superseded in place**, with a note
-  saying what was tried and why it failed — never renumbered, never deleted. See W3.
+- ⚠️ **Ids are stable.** A rule that turns out to be wrong is superseded in place — never
+  renumbered, never deleted, because a hole in the sequence breaks every citation pointing past it.
 
-**What is not here.** Settled design decisions of this engine — one story, one branch, one PR; the
-Writer runs first; tasks share the story's branch — are mechanism, not axioms. They live in
-`CLAUDE.md`. So do platform facts about GitHub Actions and the host action: those are true, not
-derivable, and generalise to nothing.
+**What is not here.** Settled mechanism — one story, one branch, one PR; the Writer runs first;
+tasks share the story's branch — lives in `CLAUDE.md`. So do platform facts about GitHub Actions and
+the host action: those are true, not derivable, and generalise to nothing.
+
+**Writing a rule here.** State it flatly, and carry evidence for the claim a reader will dispute
+rather than for all of them. Name the **wrong** fix as well as the right one, or it gets
+re-litigated by whoever next has the bad idea. State the **discriminator** rather than the feeling.
+A rule with a price says the price. And two rules that look redundant are usually two failures that
+presented alike — the second is generally why the first fix did not hold.
 
 ---
 
@@ -242,7 +241,7 @@ has not run.
 ⚠️ **A deletion is announced on the issue, not just logged.** A branch that vanishes with no record is
 indistinguishable from one that was never created.
 
-> Evidence: the branch sweep shipped and was removed one PR later; its note is kept deliberately (W3).
+> Evidence: the branch sweep shipped and was removed one PR later; its note is kept deliberately.
 
 ### E12 — Fix and report, never fix quietly. A repeat escalates instead of repairing.
 
@@ -392,52 +391,3 @@ the back. But reach for **when it runs** before reaching for either a cleverer p
 one.
 
 > Evidence: the front/back split for `branch-navigation.py` is gone; it is one hook at every site.
-
----
-
-## Rules for writing rules
-
-The record's *form* is as load-bearing as its content. These are the conventions that make a ⚠️
-paragraph worth keeping.
-
-### W1 — A rule earns its place by a measured failure. Cite it where someone will argue; state it flatly where they will not.
-
-A ⚠️ that argues from principle alone is a preference wearing the marker's clothes. But a receipt on
-every sentence is how a record reaches sixteen thousand words — evidence is for the claim a reader
-will dispute, not for all of them.
-
-### W2 — Name the wrong fix, not just the right one.
-
-*"`git-push.sh` is NOT the fix, though its presence in the base allowlist suggests it is."* Without
-that line the next person spends an afternoon finding out. A rule that only says what to do gets
-re-litigated by whoever next has the bad idea.
-
-### W3 — A superseded rule stays, with what was tried and why it failed.
-
-The obsolete branch-sweep note is kept on exactly this basis. *"This paragraph used to say the
-opposite"* is a sentence worth writing. Deleting a wrong rule deletes the reason nobody should try it
-again.
-
-### W4 — Two paragraphs that look redundant are usually two failures that presented alike.
-
-Do not merge on similarity. The second one is generally why the rule survived contact with the first
-fix — #1159 is the fix for #1140 reproducing the same shape one level down.
-
-### W5 — State the discriminator, not the feeling.
-
-Name the behaviour (backgrounding), not the mood (giving up). Name the test (*does a specification
-need writing before the code?*), not the judgement (*does this deserve a spec?*) — a role asked the
-second question answered it wrong every time.
-
-### W6 — Twice is the threshold. After that, assert it instead of restating it.
-
-Counting the instances is what tells you when you are there, and the count is a working note rather
-than something to publish. *"Prose review had already passed this twice"* is the sentence that should
-produce a test, not a stronger adjective. *"This trap survived being documented and was written again
-anyway, twice"* is the same signal, unheeded.
-
-### W7 — A rule with a price says the price.
-
-*"The cost, accepted: a story branch that exists even when a run produces nothing."* *"With the
-accepted cost that a hand-written sub-issue is never auto-parented."* A rule whose price is unstated
-will be reversed by whoever next pays it.
