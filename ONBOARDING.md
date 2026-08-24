@@ -70,16 +70,24 @@ Then, in order:
 branch, and remember nothing takes effect until merge, because `issues` events always run the
 workflow from the default branch.
 
-## 1. Decide the four inputs
+## 1. Decide the inputs
 
 Settle these before touching files; each is a judgment call about the target, not boilerplate.
+⚠️ **Two of them are answers only the maintainer holds** — the board (`project_owner` /
+`project_number`) and the dispatch App's slug. They are not derivable from the target repo:
+**ask, and do not proceed on a guess.** Every other input you can settle by reading the repo.
 
 - **`project_owner` / `project_number`** — the GitHub Projects board its issues and PRs go on.
-- **`allowed_bots`** — `""` unless a dispatch App is installed on the target. Empty means the
-  task cascade is **dark**: a finished task will not dispatch the next one, and the maintainer's
-  label gesture drives everything. That is the correct starting state — the cascade is an
-  upgrade, not a prerequisite — and the value is flipped to the App's slug later, when the App
-  half of step 6 happens. ⚠️ Name the App, never `*`: a wildcard admits any App on GitHub.
+- **`allowed_bots`** — **ask the maintainer for the dispatch App's current slug**, the same way
+  you ask for the board. Two questions, asked outright: *should the cascade drive this repo*,
+  and *what is the App named right now*. ⚠️ Ask for the name even if you think you know it —
+  Apps get renamed, the slug is the identity, and a stub admitting a stale slug refuses every
+  cascaded run at setup with *"Workflow initiated by non-human actor"*. The answer `""` is the
+  explicit decision to start **dark**: a finished task will not dispatch the next one, and the
+  maintainer's label gesture drives everything — a valid starting state, since the cascade is an
+  upgrade, not a prerequisite. ⚠️ The slug only *admits* the App: the cascade also needs the App
+  installed on the repository and its secrets set (step 6). ⚠️ Name the App, never `*`: a
+  wildcard admits any App on GitHub.
 - **`node`** — `true` if any author needs a runtime to install or build with; a repo whose gate
   is `npm run <anything>` wants it even with zero dependencies. ⚠️ `true` requires a
   **committed `package-lock.json`**, even with zero dependencies: `actions/setup-node`'s npm

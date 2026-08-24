@@ -18,7 +18,12 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
-**Action required:** n/a — nothing has landed since `v2`.
+**Action required:** no — install-runbook change only; nothing for an existing consumer.
+
+- The install now asks the maintainer for the dispatch App'''s slug outright, beside the board,
+  instead of deferring it to the App half of step 6. Prompted by an App rename: a stub admitting
+  a stale slug refuses every cascaded run at setup, and the runbook now asks for the current
+  name even when the installer thinks they know it.
 
 ## v2
 
