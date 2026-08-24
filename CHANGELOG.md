@@ -18,9 +18,13 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
-**Action required:** no — install-runbook change only; nothing for an existing consumer.
+**Action required:** no — nothing for an existing consumer.
 
-- The install now asks the maintainer for the dispatch App'''s slug outright, beside the board,
+- **`hooks/run.py` is one entry point for the deterministic verbs** — `--list` names them, an
+  unknown verb fails naming the known set, and a verb runs its hook with the caller's env and
+  exit code. Adds no behaviour; it exists so a session driving a story invokes the same code a
+  CI step does (epic #78, the verbs story). Nothing in `team.yml` changes.
+- The install now asks the maintainer for the dispatch App's slug outright, beside the board,
   instead of deferring it to the App half of step 6. Prompted by an App rename: a stub admitting
   a stale slug refuses every cascaded run at setup, and the runbook now asks for the current
   name even when the installer thinks they know it.
