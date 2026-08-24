@@ -33,10 +33,12 @@ Then, in order:
    heading carries an `**Action required:**` line. If they all say `no`, steps 2 and 5 are the
    whole upgrade.
 
-2. **Bump the `uses:` ref.** It is the only pin a consumer holds — `TEAM_REF` lives inside the
-   workflow and moves with the tag, so a consumer never edits it and must never be told to.
-   ⚠️ A repo that deliberately tracks `@mainline` skips this; see the release note in `CLAUDE.md`
-   for which ones and why.
+2. **Bump the `uses:` ref, and the rule's `team-ref` with it.** That ref is the
+   only pin a consumer holds — `TEAM_REF` lives inside the workflow and moves with the tag, so a
+   consumer never edits it and must never be told to. ⚠️ **Re-fetch `.claude/rules/claude-team.md` from the
+   new ref** (§2) and check its `team-ref` matches: the two are one fact in two places, and a
+   mismatch is exactly the half-done upgrade nothing else can see. ⚠️ A repo that deliberately
+   tracks `@mainline` skips the bump; see the release note in `CLAUDE.md` for which ones and why.
 
 3. **Reconcile the stub — do not recreate it.** Diff it against
    [`templates/consumer-stub.yml`](templates/consumer-stub.yml). Everything but the header comment,
@@ -104,6 +106,25 @@ ceiling the team's jobs draw down from, not a grant to the stub itself. Cutting 
 
 If authors need setup beyond installing dependencies, add an executable `.claude-team/setup.sh`
 ([`templates/setup.sh.example`](templates/setup.sh.example)); otherwise omit it.
+
+### The rule, written in this same step
+
+A consumer's clone holds the stub and the overlays, and neither tells a **session** opened against
+that repo what the team is. Install the rule that does, from the same tag you just pinned:
+
+```bash
+mkdir -p <target>/.claude/rules
+curl -fsSL https://raw.githubusercontent.com/matt-whitaker/claude-team/vN/rules/claude-team.md \
+  -o <target>/.claude/rules/claude-team.md
+```
+
+⚠️ **Set its `team-ref` to the ref you pinned above.** It is not a second version number — it is
+the pin, recorded where a session reads rather than where a workflow does, and it is why the two
+are written in one step. ⚠️ **A `team-ref` that disagrees with the `uses:` pin is a half-done
+upgrade**, and the only part of one a clone can detect on its own.
+
+⚠️ **It carries no role instruction.** A role is given `prompts/` at run time; a rule scopes by
+file path, never by who is running.
 
 ## 3. The overlays — where the target's personality lives
 

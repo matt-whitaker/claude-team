@@ -466,6 +466,51 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
         self.assertIn("## Unreleased", self.CLAUDEMD)
 
 
+class TheRuleASessionReads(unittest.TestCase):
+    """⚠️ A consumer's clone holds the stub and the overlays, and neither tells a SESSION opened
+    against that repo what an epic is or where work goes — claude-team's own CLAUDE.md is not in
+    that clone. `rules/claude-team.md` is that install, and these pin the two things that make it
+    safe rather than a third drifting copy."""
+
+    ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+    def setUp(self):
+        self.RULE = (self.ROOT / "rules/claude-team.md").read_text()
+        self.CLAUDEMD = (self.ROOT / "CLAUDE.md").read_text()
+        self.ONBOARDING = (self.ROOT / "ONBOARDING.md").read_text()
+
+    @staticmethod
+    def _levels(text):
+        """The bolded first cell of every row in the issue-hierarchy table."""
+        table = text[text.index("| level | branch |"):]
+        table = table[:table.index("\n\n")]
+        return [r.split("|")[1].strip() for r in table.splitlines()[2:]]
+
+    def test_it_records_the_PIN_rather_than_inventing_a_version(self):
+        """⚠️ THE DECISION THIS COULD HAVE COLLIDED WITH. ONBOARDING already refuses a revision
+        integer because `the pin *is* the signal`. `team-ref` is not a second number — it is that
+        pin, written where a session reads instead of where a workflow does, which is why the two
+        are set in one step and why disagreement is a defect rather than a version skew."""
+        self.assertRegex(self.RULE, r"\*\*team-ref: \S+\*\*")
+        self.assertIn("the pin *is* the signal", self.ONBOARDING)
+        self.assertIn("team-ref", self.ONBOARDING)
+
+    def test_its_hierarchy_cannot_drift_from_CLAUDE_md(self):
+        """⚠️ A third statement of the same facts is a third thing that drifts, and prose review
+        does not catch a missing table row. Asserted against CLAUDE.md, which is the session-facing
+        source this file is an extract of."""
+        self.assertEqual(self._levels(self.RULE), self._levels(self.CLAUDEMD))
+
+    def test_it_carries_no_ROLE_instruction(self):
+        """⚠️ A rule scopes by file path, never by who is running — so a role's instructions cannot
+        become one. Roles are given `prompts/` at run time; this file is read by everyone in the
+        repo, including a person's session that is not a role at all."""
+        self.assertIn("never by who is running", self.RULE)
+        for role_shaped in ("You are the", "Your task is", "Role: implementor"):
+            with self.subTest(text=role_shaped):
+                self.assertNotIn(role_shaped, self.RULE)
+
+
 class TheEmptyHandoffKeepsItsEvidence(unittest.TestCase):
     """⚠️ #32, second half. A role step that succeeds and returns no handoff silently halts a
     story, and WHY it produced nothing is unknowable from anything else the run keeps. On the run
