@@ -18,6 +18,10 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
+**Action required:** n/a — nothing has landed since `v2`.
+
+## v2
+
 **Action required:** yes — one stub input, one label re-sync, one overlay check.
 
 - **The stub gains a `runtimes` input.** It names the commands an authoring role may run, so it
