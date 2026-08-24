@@ -347,6 +347,17 @@ a real gap, worth announcing, carrying a remedy. `consult` means the script deci
 allows and the only open question is a judgement about a sentence. `report-route.py` stays **silent**
 on a consultation that changed nothing.
 
+⚠️ [E1] **SUPERSEDED (2026-08-24): THE CONSULT IS GONE, AND THE ROOT ROLE NOW BAILS.** The two
+paragraphs above shipped, worked, and were retired deliberately with epic #78: conversation moved
+to the **session driver**, and the CI root role became its fallback. A bare mention settles to
+`claude` deterministically — scripted again, which is where E1 wanted it — and the role does its
+custodial work in full, then replies only that the fallback fired, pointing the maintainer to a
+session. **A fallback that starts work turns a missed ping into a run nobody reviewed**, so the
+request-routing died with the consult: `@claude/<role>` is now the one way a comment invokes a
+runner. The interception machinery survives solely for `defaulted` routes. The paragraphs stay
+because their reasoning still binds — a regex cannot read a sentence, which is exactly why the
+judgement moved to a session rather than back into script.
+
 ⚠️ **This is not a role chaining off another**, which remains forbidden. The maintainer triggered the
 run; the router is deciding which role serves that trigger.
 
@@ -457,7 +468,7 @@ is a setup failure, so there is no result payload and `num_turns` cannot diagnos
 
 | role | picked up from | writes |
 |---|---|---|
-| `@claude` | its name in a **comment**, with no role handle; **and** a route the script had to guess | an answer, a role name, and repairs to process state. No code, no branch, no PR |
+| `@claude` | its name in a **comment**, with no role handle; **and** a route the script had to guess | repairs to process state, a role name on a guessed route, and otherwise a bail notice pointing to the session. No code, no branch, no PR |
 | Architect | an epic or an unshaped story | the issue, a story's branch name, and its tasks |
 | Researcher | a spike | findings and a recommendation, appended to the issue by a hook — it holds no shell |
 | Implementor | a task stamped `Role: implementor` | code, outside the design system |

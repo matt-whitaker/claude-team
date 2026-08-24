@@ -267,7 +267,7 @@ jobs:
       # is not "script or model", it is "read the issue or guess".
       - id: route-schema
         name: Load the routing schema
-        if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
+        if: steps.route.outputs.defaulted == 'true'
         run: |
           # same constraints as the handoff and findings schemas: one line, and no single quote,
           # because it is inlined into a single-quoted claude_args flag
@@ -278,13 +278,13 @@ jobs:
           echo "body=$body" >> "$GITHUB_OUTPUT"
           echo "routing schema loaded (${#body} chars)"
       - id: route-prompt
-        if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
+        if: steps.route.outputs.defaulted == 'true'
         uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: route
       - id: custodian
         name: Ask the root role which role this is
-        if: steps.route.outputs.defaulted == 'true' || steps.route.outputs.consult == 'true'
+        if: steps.route.outputs.defaulted == 'true'
         # ⚠️ A FAILED INTERCEPTION MUST NOT MEAN NOTHING RUNS. The script's default is the floor:
         # `resolve` falls back to it whenever this step produces no usable answer, and this keeps
         # the job green so it gets there. Degrading to the old behaviour is the correct failure.
@@ -435,11 +435,8 @@ jobs:
           REASON: ${{ steps.resolve.outputs.reason }}
           REMEDY: ${{ steps.resolve.outputs.remedy }}
           RESOLVED_BY: ${{ steps.resolve.outputs.resolved_by }}
-          # ⚠️ A consultation is not a gap. `defaulted` means state was missing and the issue needs
-          # fixing; `consult` means someone typed `@claude` and the only open question was whether
-          # they wanted words or work. Announcing every one of those would be noise, so the hook
-          # speaks only when the answer changed what runs.
-          CONSULT: ${{ steps.route.outputs.consult }}
+          # ⚠️ `consult` was removed with rule 1b's interception (epic #78): a bare mention now
+          # settles to the root role, which bails. Only `defaulted` reaches the interception.
           SCRIPT_ROLES: ${{ steps.route.outputs.roles }}
         run: "$RUNNER_TEMP/agent-bin/report-route.py"
 

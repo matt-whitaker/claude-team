@@ -46,5 +46,29 @@ class Delegate(HookCase):
         self.assertIn("story=746", self.line(r))
 
 
+
+    # ---- rule 1b: a bare mention settles to the root role, which bails (epic #78) ----
+
+    def test_bare_mention_settles_to_the_root_role(self):
+        r = self.route("1092", STORY_WITH_KIDS, comment="@claude what happened here?",
+                       event="issue_comment", label="")
+        self.assertIn("roles=claude", self.line(r))
+        self.assertNotIn("consult", r.outputs, "delegate emits no consult output")
+        self.assertIn("bails", self.line(r))
+
+    def test_bare_mention_on_a_task_routes_to_the_custodian_diagnosis(self):
+        r = self.route("1093", TASK, comment="@claude", event="issue_comment", label="")
+        self.assertIn("roles=claude", self.line(r))
+        self.assertIn("presumed stuck", self.line(r))
+
+    def test_a_work_request_in_a_comment_reaches_no_working_role(self):
+        r = self.route("1092", STORY_WITH_KIDS,
+                       comment="@claude I believe this branch needs to be updated from its base",
+                       event="issue_comment", label="")
+        self.assertIn("roles=claude", self.line(r))
+        self.assertEqual(r.outputs.get("dispatch"), "false",
+                         "a comment must never start a wave")
+
+
 if __name__ == "__main__":
     unittest.main()

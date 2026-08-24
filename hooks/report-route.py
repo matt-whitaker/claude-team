@@ -39,32 +39,11 @@ MARKER = "<!-- claude-team:routing-guess -->"
 if not team.REPO:
     team.fail("REPO is required")
 
-CONSULT = os.environ.get("CONSULT", "") == "true"
 SCRIPT_ROLES = os.environ.get("SCRIPT_ROLES", "")
 
-if not (NUMBER and ROLES) or not (DEFAULTED or CONSULT):
-    raise SystemExit(0)
-
-# ⚠️ A CONSULTATION IS NOT A GAP, AND MOST OF THEM DESERVE SILENCE. `defaulted` means the state
-# that should have decided is missing — worth announcing, and it carries a remedy. `consult` means
-# somebody typed `@claude` and the only open question was whether they wanted words or work. When
-# the answer is "words", the run does exactly what it would have done anyway and there is nothing
-# to report; announcing it every time would make this notice the thing people skim past.
-#
-# ⚠️ But when a consultation CHANGES the route, say so — that is the maintainer asking for one
-# thing and getting another, correctly, and they should not have to infer it from which job ran.
-if CONSULT and not DEFAULTED and ROLES == SCRIPT_ROLES:
-    print(f"consulted, and the route is unchanged ({ROLES}) — nothing to report.")
-    raise SystemExit(0)
-
-if CONSULT and not DEFAULTED:
-    team.upsert_comment(
-        NUMBER, MARKER,
-        f"{MARKER}\n🔔 **You asked `@claude`, and this reads as a request for work rather than a "
-        f"question — so it was routed to `{ROLES}` instead of being answered.** {REASON}\n\n"
-        f"If you wanted an answer rather than the work, say so and it will not route again."
-        + team.run_footer(),
-    )
+# Only a `defaulted` route is reported — the real gap, carrying a remedy. A bare mention
+# settles to the root role, which bails (epic #78); nothing to report there.
+if not (NUMBER and ROLES) or not DEFAULTED:
     raise SystemExit(0)
 
 if RESOLVED_BY == "custodian":
