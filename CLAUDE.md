@@ -18,6 +18,21 @@ exercise the engine tracks `@mainline` instead — brewdocs.beer as the canary, 
 as the drill target, and this repo's own stub, which `SelfInstall` pins there permanently.
 brewdocs.beer-kb also tracks `@mainline`, by the maintainer's call rather than by the rule.
 
+⚠️ **THE SUITE CANNOT SEE WHICH COMMIT GOT TAGGED, so the release ends with a check on the tag
+itself.** `ReleasePins` asserts the four pins agree with *each other* — on mainline they all read
+`mainline`, so it is green on exactly the tree a mis-cut tag ships. Nothing else looks either. The
+stub is the consumer's own pin, which makes it the sharpest single probe:
+
+```bash
+git show vN:templates/consumer-stub.yml | grep 'team.yml@'   # must print @vN, never @mainline
+```
+
+⚠️ **The plausible mis-cut is tagging the default branch's head.** The release commit is
+deliberately not on any branch, so every tool that defaults to a branch — the GitHub Releases page
+included — targets the wrong commit while looking exactly right. What ships is a `vN` whose jobs
+fetch every hook and prompt from `mainline` at run time and a stub telling the consumer to pin
+`@mainline`: pinning that pins nothing.
+
 ⚠️ **A release is not finished when the tag is pushed.** `ONBOARDING.md` §0 is the returning
 consumer's path and `CHANGELOG.md` is what makes it answerable. A consumer has one question — *must
 I act?* — so every version heading carries an explicit `**Action required:**` line and a test

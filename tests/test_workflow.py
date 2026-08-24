@@ -447,6 +447,17 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
         self.assertIn("Unreleased", release)
         self.assertIn("CHANGELOG.md", release)
 
+    def test_the_release_procedure_ends_by_checking_the_TAG(self):
+        """⚠️ THE ONE FAILURE THIS SUITE IS STRUCTURALLY BLIND TO. Every test here runs against a
+        checkout; none can see which commit a tag was put on. `ReleasePins` asserts the four pins
+        agree with each other, so it passes on mainline — where they all read `mainline` — which is
+        exactly the tree a tag cut from the default branch's head ships. The procedure has to carry
+        a check on the tag itself, and this asserts it still does."""
+        release = self.CLAUDEMD[self.CLAUDEMD.index("**Releasing**"):]
+        release = release[:release.index("## Working in this repo")]
+        self.assertIn("git show vN:templates/consumer-stub.yml", release)
+        self.assertIn("@mainline", release)
+
 
 class TheEmptyHandoffKeepsItsEvidence(unittest.TestCase):
     """⚠️ #32, second half. A role step that succeeds and returns no handoff silently halts a
