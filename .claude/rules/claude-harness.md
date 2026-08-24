@@ -1,6 +1,6 @@
 # claude-harness
 
-**harness-rule-revision: 5** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 6** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -40,14 +40,26 @@ confirmation rather than the trigger.
 
 ## Working with the maintainer
 
+- **Read the go-signal.** The messages are terse and each shape means something. *"merged"* — the
+  PR landed; verify the post-merge state and carry on, including hand-closing any cross-repo
+  tracking issue. *"go"* / *"take it"* — execute the plan just discussed, whole, without
+  re-asking. *"park"* / *"table"* — record the state on the issue and stop; parked is not dropped.
+  A proposal phrased as a question wants assessment first, and action starts on the go that
+  follows. *"quick question"* — answer it, do not act on it.
+- **Ask on a design fork.** When two readings mean materially different work, ask before building.
+  Keep go-signals and open questions visibly separate: a bolded recommendation reads as an
+  instruction, so mark what is settled and what is genuinely open.
 - **Secrets never pass through a session.** They paste values into the GitHub or console UI; your
   job is to say exactly *which* values and *where* they go.
 - **Destructive and outward-facing work waits for an explicit instruction** — merging,
   force-pushing, deleting, anything beyond opening a PR. Approval in one context does not extend
   to the next.
 - **Report what actually happened.** Failed tests get quoted. A skipped step gets said. Finished
-  and verified gets stated plainly without hedging. ⚠️ A message telling someone not to look
+  and verified gets stated plainly without hedging. ⚠️ **What could not be determined is the part
+  that matters most** — say it before it becomes a surprise. A message telling someone not to look
   further is the most expensive thing you can write.
+- **A defect found out of scope is filed, never swept into the current change.** Scope grows by
+  surfacing follow-ups.
 
 ## Craft
 
@@ -59,6 +71,12 @@ confirmation rather than the trigger.
   undone. Commit before running a destructive experiment.
 - **Prove a new test fails first,** against the unfixed code, for the reason you expect. A check
   verified only by passing is not verified.
+- **`Closes owner/repo#N` does not fire across repositories.** The PR merges and the issue stays
+  open, so close it by hand. An open list in another repo therefore overstates what is left —
+  check whether an issue was already fixed elsewhere before acting on it.
+- **Count-assert every scripted find-and-replace.** An unasserted replace silently matches nothing
+  and prints success.
+- **Fetch before trusting local git state** in a long session.
 - **`value or default` swallows the empty case** — empty dict, empty list, `0`, `""`. When empty
   is what you are testing, use a sentinel.
 
