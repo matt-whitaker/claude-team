@@ -18,7 +18,14 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
-**Action required:** no — nothing for an existing consumer.
+**Action required:** no — nothing to configure, but bare mentions behave differently.
+
+- **A bare `@claude` comment no longer answers or routes — the CI root role bails.** It does its
+  custodial work (repairs, stuck-task diagnosis) and otherwise replies that the fallback fired,
+  pointing the maintainer to a session. Rule 1b's consult is removed with it: nothing turns a
+  comment into a run any more except an explicit `@claude/<role>` handle. The label front door,
+  the cascade, and `defaulted`-route interception are untouched. (Epic #78, the session-driver
+  model.)
 
 - **`hooks/run.py` is one entry point for the deterministic verbs** — `--list` names them, an
   unknown verb fails naming the known set, and a verb runs its hook with the caller's env and

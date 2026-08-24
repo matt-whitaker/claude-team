@@ -42,13 +42,11 @@ ROLES = STORY = STORY_BRANCH = REASON = KIND = REMEDY = ""
 DEFAULTED = False
 DISPATCH = False
 
-# ⚠️ CONSULT IS NOT DEFAULTED, AND CONFLATING THEM WOULD BE WRONG IN BOTH DIRECTIONS.
-# `defaulted` means the state that should have decided is MISSING — a real gap, worth announcing
-# and worth a remedy. `consult` means the script decided correctly as far as it can, but the
-# question it cannot answer is whether the maintainer wanted a conversation or wanted work. That
-# is a judgement, not a gap: there is nothing to fix on the issue, and announcing it every time
-# someone types `@claude` would be pure noise.
-CONSULT = False
+# ⚠️ `consult` USED TO LIVE HERE, AND ITS REMOVAL IS DELIBERATE (2026-08-24, epic #78). It was
+# rule 1b's "is this a question or a request" interception, distinct from `defaulted` (missing
+# state, a real gap, still consulted). The comment path no longer asks: a bare mention settles to
+# the root role, which acts custodially and BAILS with a notice — the session is where the
+# conversation happens. Do not reintroduce a consult here without reading the epic first.
 
 
 def emit() -> None:
@@ -67,7 +65,7 @@ def emit() -> None:
         with open(out, "a", encoding="utf-8") as handle:
             handle.write(
                 f"roles={ROLES}\nstory={STORY}\nstory_branch={STORY_BRANCH}\nkind={KIND}\n"
-                f"defaulted={str(DEFAULTED).lower()}\nconsult={str(CONSULT).lower()}\n"
+                f"defaulted={str(DEFAULTED).lower()}\n"
                 f"dispatch={str(DISPATCH).lower()}\n"
                 f"reason={REASON}\nremedy={REMEDY}\n"
             )
@@ -164,42 +162,27 @@ for role in ("architect", "researcher", "implementor", "tester", "writer", "desi
         emit()
         raise SystemExit(0)
 
-# ---- 1b. a bare `@claude` in a COMMENT is a conversation, not a route
+# ---- 1b. a bare `@claude` in a COMMENT settles to the root role, which bails
 #
-# ⚠️ COMMENT ONLY. The `@claude` **label** still routes exactly as it always has — that is the
-# front door and nothing here touches it. The split is worth stating plainly because it is the
-# whole ergonomics of the change: **the label does the work, a comment talks about it.**
+# ⚠️ COMMENT ONLY. The `@claude` **label** is the front door and routes untouched by this rule:
+# the label does the work, a comment talks about it.
 #
-# Reaching here means rule 1 found no `@claude/<role>` handle, so the trigger named `@claude`
-# and nothing more. Previously that fell through to rules 2-4 and started whichever role the
-# state implied — so typing "@claude what happened here?" ran an Implementor. Nothing is lost by
-# ending it: `@claude/<role>` still names a role outright, and re-adding the label is the
-# documented "run again" gesture.
+# Reaching here means rule 1 found no `@claude/<role>` handle. The route is deterministic:
+# `claude`, the CI fallback. Its prompt bounds what runs there — custodial work in full, a bail
+# notice for everything else. Conversation belongs to the session driver (epic #78); a comment
+# invokes a runner only through an explicit `@claude/<role>` handle. ⚠️ Do not add a model
+# consultation here — the interception serves `defaulted` routes only, and CLAUDE.md's routing
+# section carries the record of the consult this replaced.
 #
-# ⚠️ An unknown handle lands here too (`@claude/nonsense` matches no role), and that is the right
-# home for it — the root role can say there is no such role, where rule 3 would have silently
-# shaped the issue as a story instead.
+# An unknown handle (`@claude/nonsense`) lands here too; the root role says there is no such
+# role.
 #
-# ⚠️ AND IT ASKS RATHER THAN ASSUMING, because "a bare @claude is a question" is true most of the
-# time and expensively wrong the rest. Measured: a maintainer commented "@claude I believe this
-# branch needs to be updated from its base" — a request for WORK. The script had a clear
-# path straight to the conversational role, so the delegate-phase custodian never ran, and the
-# role that answered was structurally unable to do anything about it. The path was clear and
-# wrong, which no amount of scripted state can detect: only reading the sentence tells you.
-#
-# So this sets `consult`, not a settled route. The custodian in the delegate phase decides
-# question-or-work BEFORE the role jobs gate on the answer — which is the only point at which
-# the decision can still change what runs. `claude` remains the fallback, so a failed, skipped or
-# undecided interception lands exactly where this rule used to send it outright.
-#
-# ⚠️ EXCEPT ON A TASK, WHERE THERE IS NO QUESTION TO ASK. A task reached by a bare `@claude` is
-# presumed STUCK — its runs happen from its story, so a human landing on the task itself is
-# there because something did not happen. That is the Custodian's job (diagnose, repair,
-# report), and it is decidable from structure: a task's Branch line names another issue's
-# branch. Deterministic, so no consultation — the Delegator is for judgement, not for facts.
+# ⚠️ EXCEPT ON A TASK: a task reached by a bare `@claude` is presumed STUCK — its runs happen
+# from its story, so a human landing on the task itself is there because something did not
+# happen. The Custodian diagnoses. Decidable from structure: a task's Branch line names another
+# issue's branch.
 if COMMENT_BODY and "@claude" in COMMENT_BODY:
     ROLES = "claude"
-    REASON = "@claude named in a comment with no role handle — asking whether this is a question or work"
     # the same context a handle gets: being conversational is no reason to arrive uninformed
     if NUMBER:
         if IS_PR:
@@ -213,7 +196,7 @@ if COMMENT_BODY and "@claude" in COMMENT_BODY:
             "rather than re-running it"
         )
     else:
-        CONSULT = True
+        REASON = "@claude named in a comment with no role handle — the CI fallback answers custodially and bails"
     emit()
     raise SystemExit(0)
 

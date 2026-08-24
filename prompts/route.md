@@ -25,17 +25,16 @@ script cannot: what the issue actually describes.
 - `$STORY` — the story this belongs to, where one could be resolved. Often empty here, and that
   emptiness is itself a signal.
 
-## The three ways you get here
+## The two ways you get here
 
 - **A task with no `Role:` stamp.** The Architect writes it; an issue filed by hand has none. The
   body still says what the work is, and that is what you read.
 - **A story that was triggered instead of one of its tasks.** It has sub-issues and no stamp of its
   own. Nothing should run on it directly.
-- **Somebody wrote a bare `@claude` in a comment** — on a story or a PR. ⚠️ A bare `@claude` on a
-  **task** never reaches you: a task is presumed stuck and routes to the Custodian by structure,
-  not judgement. **This one is different from the other two: nothing is missing.** The script knows exactly where it would send this — to you, conversationally
-  — and the only thing it cannot read is whether the maintainer wanted an ANSWER or wanted WORK.
-  That is a sentence to be read, not a state to be looked up.
+
+⚠️ **A bare `@claude` in a comment never reaches you**: it settles to the root role, which acts
+custodially and bails to the session (epic #78). Arriving here on a comment path means routing
+is wrong — say so rather than picking a role.
 
 ## How to decide
 
