@@ -128,9 +128,9 @@ on:
         type: string
         required: true
       allowed_bots:
-        description: Comma-separated bot logins admitted at the model steps (the dispatch App). Empty admits none.
+        description: Comma-separated bot logins admitted at the model steps (the dispatch App). Empty admits none; the default is this fleet's dispatch App.
         type: string
-        default: ""
+        default: "mattwhitaker-claude"
       node:
         description: Set up Node with npm cache and run npm ci before author runs
         type: boolean

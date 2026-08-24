@@ -73,11 +73,12 @@ workflow from the default branch.
 Settle these before touching files; each is a judgment call about the target, not boilerplate.
 
 - **`project_owner` / `project_number`** — the GitHub Projects board its issues and PRs go on.
-- **`allowed_bots`** — `""` unless a dispatch App is installed on the target. Empty means the
-  task cascade is **dark**: a finished task will not dispatch the next one, and the maintainer's
-  label gesture drives everything. That is the correct starting state — the cascade is an
-  upgrade, not a prerequisite — and the value is flipped to the App's slug later, when the App
-  half of step 6 happens. ⚠️ Name the App, never `*`: a wildcard admits any App on GitHub.
+- **`allowed_bots`** — defaults to `mattwhitaker-claude`, the account-wide dispatch App. Leave
+  it if that App is (or will be) installed on the target; set `""` to run the cascade **dark** —
+  a finished task will not dispatch the next one, and the maintainer's label gesture drives
+  everything, which is a valid starting state. ⚠️ The default only *admits* the App: the cascade
+  also needs the App installed on the repository and its secrets set (step 6), or dispatch stays
+  a `::notice::`. ⚠️ Name an App, never `*`: a wildcard admits any App on GitHub.
 - **`node`** — `true` if any author needs a runtime to install or build with; a repo whose gate
   is `npm run <anything>` wants it even with zero dependencies. ⚠️ `true` requires a
   **committed `package-lock.json`**, even with zero dependencies: `actions/setup-node`'s npm

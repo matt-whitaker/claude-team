@@ -18,7 +18,15 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
-**Action required:** n/a — nothing has landed since `v2`.
+**Action required:** yes — but only if your stub names the old App slug.
+
+- **`allowed_bots` now defaults to `mattwhitaker-claude`**, the account-wide dispatch App
+  (renamed from `brewdocs-claude`). An explicit value in your stub still overrides — including
+  an explicit `""`, which keeps the cascade dark. Consequence of the **rename**, independent of
+  the default: a stub still admitting `brewdocs-claude` names a slug that no longer exists, and
+  every cascaded run is refused at setup with *"Workflow initiated by non-human actor"* — update
+  it to `mattwhitaker-claude`. The cascade still requires the App installed on the repository
+  and its secrets set; the default only admits it.
 
 ## v2
 

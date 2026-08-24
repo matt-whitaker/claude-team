@@ -56,7 +56,10 @@ jobs:
     with:
       project_owner: CHANGE-ME
       project_number: "0"
-      allowed_bots: ""
+      # The fleet's dispatch App, admitted at the model steps so a finished task can
+      # cascade the next. Set "" to run the cascade dark; never `*`, which admits any
+      # App on GitHub with a prompt it controls.
+      allowed_bots: mattwhitaker-claude
       node: false
       browser: false
       # The commands an authoring role may run, so it can execute THIS repo's gate.

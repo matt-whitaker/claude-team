@@ -98,7 +98,7 @@ not happen, never as a failure.
 |---|---|---|
 | `project_owner` | yes | the board's URL — the user or org that owns it |
 | `project_number` | yes | the board's URL, `…/projects/<N>` |
-| `allowed_bots` | no | the dispatch App's login, `<app-slug>[bot]`. Empty admits none |
+| `allowed_bots` | no | the dispatch App's login. Defaults to `mattwhitaker-claude`, the fleet's App; `""` admits none |
 | `node` | no | your call — `true` runs `npm ci` before author runs |
 | `browser` | no | your call — `true` installs the Playwright chromium |
 | `runtimes` | no | **your repo's gate** — the commands an author must be able to run. Defaults to `npm,npx,node` |
