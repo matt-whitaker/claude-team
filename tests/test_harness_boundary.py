@@ -41,73 +41,43 @@ class TheHarnessRuleIsInstalled(unittest.TestCase):
                                  f"{local!r} is this repo's — it does not belong in a portable rule")
 
 
-class TheLocalRuleCarriesOnlyThisRepo(unittest.TestCase):
-    """⚠️ `working-here.md` is what is left after the portable half moved out. A fact that drifts
-    back into it is invisible to every other repo that would hit the same trap — which is exactly
-    what happened to four git lessons before the split.
+class RulesHoldInstalledModulesOnly(unittest.TestCase):
+    """⚠️ `ls .claude/rules/` is the manifest of what is installed here, which only means anything
+    while every entry came from somewhere else. A file the repo wrote itself sitting in that
+    directory makes the listing a mix of two things and the manifest stops answering the question.
 
-    ⚠️ IT REPLACED `CLAUDE_CLOUD.md`, WHOSE CLOUD-NESS WAS AN ARTIFACT OF DELIVERY. That file
-    existed because a cloud session has no memory and needed a committed one, so it carried a
-    read-only-if-cloud gate, a never-`@path`-import warning, and a merge line dividing template
-    framing from repo content. A rule is committed, loads in both environments, is discovered
-    without being mentioned, and is owned by whoever ships it — so all three devices became
-    unnecessary at once. `test_no_file_needs_a_gate_or_a_merge_line` pins that they stayed gone."""
+    ⚠️ No install writes a `CLAUDE.md`, which is what makes the division checkable rather than a
+    matter of taste: a file that arrived from an install is a rule, a file nobody installed is
+    `CLAUDE.md`."""
 
-    # ⚠️ READ IN setUp, NOT THE CLASS BODY — and this is the SECOND time in one session. A
-    # class-body read of a missing file raises at IMPORT, which takes the whole module down and
-    # turns every clean failure into one `unittest.loader._FailedTest`, hiding the rest. Caught
-    # both times only by running the suite against the unfixed tree, which is the entire argument
-    # for doing that before trusting a new test.
-    def setUp(self):
-        path = ROOT / ".claude/rules/working-here.md"
-        self.assertTrue(path.exists(), f"{path} is missing")
-        self.LOCAL = path.read_text(encoding="utf-8")
+    RULES = ROOT / ".claude/rules"
 
-    def test_the_old_file_is_gone(self):
-        self.assertFalse((ROOT / "CLAUDE_CLOUD.md").exists(),
-                         "CLAUDE_CLOUD.md is superseded by .claude/rules/working-here.md")
+    def test_every_installed_rule_names_where_it_came_from(self):
+        for rule in sorted(self.RULES.glob("*.md")):
+            with self.subTest(rule=rule.name):
+                text = rule.read_text(encoding="utf-8")
+                self.assertRegex(
+                    text, r"-revision: \d+",
+                    f"{rule.name} carries no revision — an install compares one, so a file "
+                    "without one was not installed and does not belong here")
 
-    def test_no_file_needs_a_gate_or_a_merge_line(self):
-        """The three workarounds the old shape required. Each returning would mean the content had
-        drifted back into a file that has to be found, imported, or merged."""
-        for device, phrase in (
-            ("the read-only-if-cloud gate", "Read this only if you are"),
-            ("the @path import warning", "unbackticked"),
-            ("the repo-owned merge line", "REPO-OWNED BELOW THIS LINE"),
-        ):
-            with self.subTest(device=device):
-                self.assertNotIn(phrase, self.LOCAL)
+    def test_the_manifest_is_the_modules_and_nothing_else(self):
+        found = sorted(p.name for p in self.RULES.glob("*.md"))
+        self.assertEqual(found, ["claude-harness.md"])
 
-    def test_the_moved_facts_did_not_drift_back(self):
-        moved = {
-            "the ephemeral-container fact": "not committed and pushed is lost",
-            "the push-into-tail trap": "exit status of",
-            "the stale-ref trap": "stale info",
-            "the checkout trap": "discards every uncommitted",
-            "the prove-it-fails rule": "Prove a new test fails",
-        }
-        for name, phrase in moved.items():
-            with self.subTest(fact=name):
-                self.assertNotIn(phrase, self.LOCAL,
-                                 f"{name} belongs in claude-harness, where every repo gets it")
-
-    def test_it_still_carries_what_only_this_repo_knows(self):
-        """The other direction. Stripping too much would send a session looking for facts that
-        exist nowhere — the board number is the one with no other home."""
-        for fact in ("board is 9", "workflow ON ITSELF", "Two pins move together"):
+    def test_this_repos_own_facts_live_in_claude_md(self):
+        """The content that used to sit beside the module. It has one home, and a session reading
+        `CLAUDE.md` must find it there."""
+        text = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        for fact in ("Board: **9**", "RUNS THE TEAM WORKFLOW ON ITSELF",
+                     "no single quote", "need a LOCAL session"):
             with self.subTest(fact=fact):
-                self.assertIn(fact, self.LOCAL)
+                self.assertIn(fact, text)
 
-    def test_it_says_where_the_portable_half_went(self):
-        """A reader who remembers those facts being here must be told where they are now, or the
-        move reads as a deletion."""
-        self.assertIn("claude-harness", self.LOCAL)
-
-    def test_both_rules_are_the_only_ones_installed(self):
-        """⚠️ `ls .claude/rules/` is the manifest — that is the whole appeal of the format. A rule
-        appearing without anyone deciding to add it is the manifest ceasing to mean anything."""
-        found = sorted(p.name for p in (ROOT / ".claude/rules").glob("*.md"))
-        self.assertEqual(found, ["claude-harness.md", "working-here.md"])
+    def test_the_old_files_are_gone(self):
+        for stale in ("CLAUDE_CLOUD.md", ".claude/rules/working-here.md"):
+            with self.subTest(path=stale):
+                self.assertFalse((ROOT / stale).exists())
 
 
 if __name__ == "__main__":

@@ -77,22 +77,50 @@ paragraph at all.
   same commit.
 - `RuleIds` in `tests/test_rules.py` fails on a citation that resolves to nothing.
 
-⚠️ **A session's instructions live in `.claude/rules/`**, discovered automatically in every
-session here, cloud and local:
-
-- `claude-harness.md` — how a Claude Code session works in any repo. It comes from
-  [`claude-harness`](https://github.com/matt-whitaker/claude-harness) and is **replaced** to
-  upgrade, never merged: nothing of this repo's is written into it.
-- `working-here.md` — this repo's own. The board number, the hazards of a repo that runs the team
-  workflow on itself, and the lessons a session has nowhere else to put.
+⚠️ **`.claude/rules/` HOLDS INSTALLED MODULES, NOT THIS REPO'S OWN INSTRUCTIONS.** One entry:
+`claude-harness.md`, from [`claude-harness`](https://github.com/matt-whitaker/claude-harness) — how
+a Claude Code session works in any repo, discovered automatically in every session here, cloud and
+local. It is **replaced** to upgrade, never merged, and nothing of this repo's is written into it.
+⚠️ **`ls .claude/rules/` is the manifest of what is installed**, which only means anything while
+every entry came from somewhere else. What is true about *this* repo goes in this file.
+⚠️ **Nothing copies a `CLAUDE.md` during any install**, which is what makes the division checkable:
+a file that arrived from an install is a rule, a file nobody installed is this one.
 
 ⚠️ **This repo owns the GitHub agents; the harness owns the session.** One question sorts them:
 who invoked it. A webhook is this repo's, a person opening a session is the harness's. The two
 installs are independent, and neither writes into the other's directory — `.claude/` is the
 harness's, `.claude-team/` is a consumer's.
 
-⚠️ **A lesson true in any repo goes upstream to the harness, not into `working-here.md`.** Keeping
-one local makes it invisible to every other repo that would hit the same trap.
+⚠️ **A lesson true in any repo goes upstream to the harness, not here.** Keeping one local makes it
+invisible to every other repo that would hit the same trap.
+
+## Working in this repo
+
+- Board: **9** (Claude Team). ⚠️ Not reachable from a cloud session; see below.
+- Branch naming: `<issue#>-<kebab-summary>`, unless the session arrived pinned to one.
+
+⚠️ **A session may arrive already pinned to a branch** it should stay on, for session coherence.
+Prefer that branch over the naming convention, and say so rather than silently renaming.
+
+⚠️ **THIS REPO RUNS THE TEAM WORKFLOW ON ITSELF.** The literal front-door handle — and any
+`<handle>/<role>` form — in an issue or PR comment **starts a real run**, and backticks do not
+protect it. Write around it: say "the front-door label". Applying those labels is the maintainer's
+gesture alone.
+
+⚠️ **A run here executes the hooks at `mainline`, not the ones in your checkout.** Editing `hooks/`
+on a branch changes nothing about the run editing them. Merging changes the machinery for this
+repo, `claude-team-example`, and every consumer tracking mainline at once.
+
+⚠️ **This file is the specification.** There is no product spec; the Tester derives intent from it,
+so editing it is a change to the contract rather than to prose.
+
+⚠️ **A schema injected into a workflow step must contain no single quote** and must stay on one
+line — `--json-schema` takes inline JSON wrapped in single quotes, and the argument list is parsed
+line by line.
+
+⚠️ **Label writes and board placement need a LOCAL session.** `ONBOARDING.md` §4's label loop and
+board placement cannot be done from a cloud session — say so and hand over the command rather than
+improvising.
 
 ## The issue hierarchy
 

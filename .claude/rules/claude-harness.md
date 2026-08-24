@@ -1,10 +1,17 @@
 # claude-harness
 
-**harness-rule-revision: 3** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 4** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
-**replace it** — never merge. To uninstall, delete it. What this repo knows about itself lives in
-its own `CLAUDE.md`.
+**replace it** — never merge. To uninstall, delete it.
+
+⚠️ **`.claude/rules/` HOLDS INSTALLED MODULES. A REPO'S OWN INSTRUCTIONS GO IN ITS `CLAUDE.md`.**
+`ls .claude/rules/` is the manifest of what is installed, which only means anything while every
+entry came from somewhere else — a file the repo wrote itself sitting there makes the listing a
+mix of two things and it stops answering the question. ⚠️ **No install writes a `CLAUDE.md`**, so
+the division is checkable rather than a matter of taste: a file that arrived from an install is a
+rule, a file nobody installed is `CLAUDE.md`. A long `CLAUDE.md` is a reason to shorten it, not a
+reason to move part of it in here.
 
 ## Which environment am I?
 
@@ -98,7 +105,7 @@ of the hook's own `load_reason` values.
 
 ## Where a durable lesson goes
 
-A local session writes it to memory. A cloud session **commits it** — to this repo's own
-`CLAUDE.md`, or wherever this repo keeps them. ⚠️ **If the lesson would be true in any repo it
+A local session writes it to memory. A cloud session **commits it to this repo's `CLAUDE.md`** —
+not to a rule, which is for what was installed. ⚠️ **If the lesson would be true in any repo it
 belongs upstream in `claude-harness`, not here** — that is the rule that stops the layers mixing
 again, and it is easiest to break when writing something down in a hurry.
