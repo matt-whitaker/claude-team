@@ -440,23 +440,30 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
     def test_the_changelog_says_what_it_is_not(self):
         self.assertIn("not a merge log", self.CHANGELOG)
 
-    def test_the_release_procedure_renames_the_unreleased_heading(self):
-        """⚠️ A changelog nobody is told to roll over accumulates one permanent Unreleased section
-        and stops distinguishing versions — which is the whole mechanism §0 reads."""
-        release = self.CLAUDEMD[self.CLAUDEMD.index("**Releasing**"):][:600]
-        self.assertIn("Unreleased", release)
-        self.assertIn("CHANGELOG.md", release)
+    def test_releasing_is_the_maintainers_and_nothing_here_explains_how(self):
+        """⚠️ A session got every part of cutting a release wrong: a commit it could not tag, a tag
+        on the wrong object, a DO-NOT-MERGE PR merged. The half a cloud session CAN do — flipping
+        the pins — is the half that is dangerous alone, so the remedy is a prohibition rather than
+        a better-written procedure."""
+        self.assertIn("RELEASING IS THE MAINTAINER'S", self.CLAUDEMD)
+        self.assertIn("Never tag", self.CLAUDEMD)
 
-    def test_the_release_procedure_ends_by_checking_the_TAG(self):
-        """⚠️ THE ONE FAILURE THIS SUITE IS STRUCTURALLY BLIND TO. Every test here runs against a
-        checkout; none can see which commit a tag was put on. `ReleasePins` asserts the four pins
-        agree with each other, so it passes on mainline — where they all read `mainline` — which is
-        exactly the tree a tag cut from the default branch's head ships. The procedure has to carry
-        a check on the tag itself, and this asserts it still does."""
-        release = self.CLAUDEMD[self.CLAUDEMD.index("**Releasing**"):]
-        release = release[:release.index("## Working in this repo")]
-        self.assertIn("git show vN:templates/consumer-stub.yml", release)
-        self.assertIn("@mainline", release)
+    def test_no_release_MECHANICS_creep_back_into_this_file(self):
+        """⚠️ A procedure left lying about is one a session will follow, so the ban is asserted
+        rather than trusted to whoever edits next. The first two entries are the imperatives that
+        made the removed text actionable — they are what makes this guard bind today; the commands
+        after them are forward-looking, and would pass on their own."""
+        for mechanic in ("tag that commit", "flip every pin", "git tag", "git push --force"):
+            with self.subTest(mechanic=mechanic):
+                self.assertNotIn(mechanic, self.CLAUDEMD)
+
+    def test_the_changelog_discipline_survives_the_procedure(self):
+        """⚠️ THE HALF THAT MUST NOT GO WITH IT. `## Unreleased` only works because every PR writes
+        its own entry; that instruction is addressed to every session, not to whoever releases. Cut
+        with the procedure, the file degrades to the merge log it exists to replace — and CLAUDE.md
+        is the copy that loads into context, so CHANGELOG.md restating it is not a substitute."""
+        self.assertIn("written in the PR that causes it", self.CLAUDEMD)
+        self.assertIn("## Unreleased", self.CLAUDEMD)
 
 
 class TheEmptyHandoffKeepsItsEvidence(unittest.TestCase):
