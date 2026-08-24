@@ -77,10 +77,33 @@ paragraph at all.
   same commit.
 - `RuleIds` in `tests/test_rules.py` fails on a citation that resolves to nothing.
 
-⚠️ **A cloud session should read `CLAUDE_CLOUD.md` first** — what a local session gets from
-memory and `~/.claude/`, which do not reach a cloud container at all. It is mentioned in backticks
-deliberately: an unbackticked `@path` is a real, unconditional import, and importing it would load
-cloud-only instructions into every local session.
+## Working in this repo
+
+- Board: **9** (Claude Team). ⚠️ Not reachable from a cloud session; see below.
+- Branch naming: `<issue#>-<kebab-summary>`, unless the session arrived pinned to one.
+
+⚠️ **A session may arrive already pinned to a branch** it should stay on, for session coherence.
+Prefer that branch over the naming convention, and say so rather than silently renaming.
+
+⚠️ **THIS REPO RUNS THE TEAM WORKFLOW ON ITSELF.** The literal front-door handle — and any
+`<handle>/<role>` form — in an issue or PR comment **starts a real run**, and backticks do not
+protect it. Write around it: say "the front-door label". Applying those labels is the maintainer's
+gesture alone.
+
+⚠️ **A run here executes the hooks at `mainline`, not the ones in your checkout.** Editing `hooks/`
+on a branch changes nothing about the run editing them. Merging changes the machinery for this
+repo, `claude-team-example`, and every consumer tracking mainline at once.
+
+⚠️ **This file is the specification.** There is no product spec; the Tester derives intent from
+it, so editing it changes the contract.
+
+⚠️ **A schema injected into a workflow step must contain no single quote** and must stay on one
+line — `--json-schema` takes inline JSON wrapped in single quotes, and the argument list is parsed
+line by line.
+
+⚠️ **Label writes and board placement need a LOCAL session.** `ONBOARDING.md` §4's label loop and
+board placement cannot be done from a cloud session — say so and hand over the command rather than
+improvising.
 
 ## The issue hierarchy
 
