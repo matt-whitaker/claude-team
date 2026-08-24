@@ -77,22 +77,6 @@ paragraph at all.
   same commit.
 - `RuleIds` in `tests/test_rules.py` fails on a citation that resolves to nothing.
 
-⚠️ **`.claude/rules/` HOLDS INSTALLED MODULES, NOT THIS REPO'S OWN INSTRUCTIONS.** One entry:
-`claude-harness.md`, from [`claude-harness`](https://github.com/matt-whitaker/claude-harness) — how
-a Claude Code session works in any repo, discovered automatically in every session here, cloud and
-local. It is **replaced** to upgrade, never merged, and nothing of this repo's is written into it.
-⚠️ **`ls .claude/rules/` is the manifest of what is installed.** What is true about *this* repo
-goes in this file. Nothing copies a `CLAUDE.md` during an install, so the division is checkable:
-a file that arrived from an install is a rule, a file nobody installed is this one.
-
-⚠️ **This repo owns the GitHub agents; the harness owns the session.** One question sorts them:
-who invoked it. A webhook is this repo's, a person opening a session is the harness's. The two
-installs are independent, and neither writes into the other's directory — `.claude/` is the
-harness's, `.claude-team/` is a consumer's.
-
-⚠️ **A lesson true in any repo goes upstream to the harness, not here.** Keeping one local makes
-it invisible to every other repo that would hit the same trap.
-
 ## Working in this repo
 
 - Board: **9** (Claude Team). ⚠️ Not reachable from a cloud session; see below.
