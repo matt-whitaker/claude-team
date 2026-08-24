@@ -380,7 +380,7 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
         """⚠️ A returning reader must not have to read §1-§7 to discover they are in the wrong
         place — §3 would overwrite an overlay carrying the repo's whole personality."""
         upgrade = self.ONBOARDING.index("## 0. Already installed?")
-        first_install_step = self.ONBOARDING.index("## 1. Decide the four inputs")
+        first_install_step = self.ONBOARDING.index("## 1. Decide the inputs")
         self.assertLess(upgrade, first_install_step)
 
     def test_the_install_steps_are_signposted_as_not_for_a_returning_reader(self):
