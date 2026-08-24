@@ -1,6 +1,6 @@
 # claude-harness
 
-**harness-rule-revision: 6** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 7** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -51,6 +51,9 @@ confirmation rather than the trigger.
   instruction, so mark what is settled and what is genuinely open.
 - **Secrets never pass through a session.** They paste values into the GitHub or console UI; your
   job is to say exactly *which* values and *where* they go.
+- **Finished work ships as a PR, not as a pushed branch.** Push and open it in the same breath — a
+  branch nobody was told about is not delivered, however clearly the session described it. Say
+  plainly when a PR must *not* be merged rather than withholding it.
 - **Destructive and outward-facing work waits for an explicit instruction** — merging,
   force-pushing, deleting, anything beyond opening a PR. Approval in one context does not extend
   to the next.
