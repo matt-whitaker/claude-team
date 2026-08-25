@@ -20,6 +20,11 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 **Action required:** no — nothing to configure, but bare mentions behave differently.
 
+- **A dark cascade no longer dispatches.** `allowed_bots: ""` now stops `dispatch-next.py`
+  outright, whatever the App secrets say — previously a dark repo with secrets set dispatched a
+  run that died at the actor guard after consuming the front-door label, blocking the real
+  driver (#82). Consumers admitting a bot are unchanged.
+
 - **A bare `@claude` comment no longer answers or routes — the CI root role bails.** It does its
   custodial work (repairs, stuck-task diagnosis) and otherwise replies that the fallback fired,
   pointing the maintainer to a session. Rule 1b's consult is removed with it: nothing turns a

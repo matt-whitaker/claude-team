@@ -454,6 +454,16 @@ it.
 - ⚠️ A stale front-door label on an open issue is a **hand-removal** — removing it re-arms the issue
   as dispatchable, which is why no sweep does it automatically.
 
+⚠️ [E7] **DISPATCH IS GATED BY THE DRIVER DECLARATION, AND FOR A WHILE IT READ A PROXY.**
+`dispatch-next.py` gated on token mintability, so a consumer with App secrets set and
+`allowed_bots: ""` — a declared human or session driver — still dispatched. The run died at the
+host action's actor guard as designed, but the dead dispatch had already consumed the front-door
+label, so the real driver's own add was a silent no-op. Measured twice in one story
+(fantasy-football #84, issue #82): both inter-wave transitions raced, both recovered only by the
+hand-remove/re-add gesture. An empty `allowed_bots` now stops dispatch outright, same quiet
+notice as no secrets; the loud error stays reserved for admitted-bots-but-no-token, the one shape
+a human must fix.
+
 ⚠️ **Guard the loop.** Every stamp is another `labeled` event. Gate the trigger on the label name
 being *exactly* the front-door label, and exclude bot actors. Both hold independently, and a third
 comes free: a stamp applied with `GITHUB_TOKEN` starts no run.
