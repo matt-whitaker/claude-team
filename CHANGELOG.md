@@ -18,6 +18,10 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
+**Action required:** n/a — nothing has landed since `v4`.
+
+## v4
+
 **Action required:** yes — App-driven repos set `CLAUDE_TEAM_DRIVER` to `cascade`; every consumer re-copies its `.claude/`, which now carries the session rule and skills as well.
 
 - ⚠️ **claude-harness is folded into claude-team; the session half now ships from one repo.** The session rule moves in as `rules/claude-session.md` (its own `session-rule-revision`, independent of the workflow pin), beside the existing `rules/claude-team.md`. The `handoff` and `take-on-story` skills move in too, and a new `upgrade-team` skill carries the upgrade flow. On upgrade, a consumer re-copies `.claude/rules/*` and `.claude/skills/*` from this repo. `ONBOARDING.md` is renamed `INSTALL.md`. The session rule arrives at `session-rule-revision: 13`, continuing the sequence it carried as `harness-rule-revision` — revisions 1–12 and their entries live in the retired repo's history, and everything they shipped is already installed fleet-wide.
