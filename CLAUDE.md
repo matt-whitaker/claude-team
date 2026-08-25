@@ -15,11 +15,21 @@ say what is in `## Unreleased` that a consumer would want, and stop. ⚠️ It i
 gap to work around: a cloud session cannot push a tag at all, so the half it *can* do — a commit
 with the pins flipped — is the half that is dangerous on its own.
 
-⚠️ **Consumers pin `@vN`**; a repo whose job is to exercise the engine tracks `@mainline` instead —
-brewdocs.beer as the canary, `claude-team-example` as the drill target, and this repo's own stub,
-which `SelfInstall` pins there permanently. brewdocs.beer-kb also tracks `@mainline`, by the
-maintainer's call rather than by the rule. ⚠️ **A `vN` appearing anywhere on `mainline` is a
-defect** — the default branch is what the canaries run, so a pin flipped there stops it being one.
+⚠️ **Every repo pins `@vN`, this one included.** Nothing tracks `@mainline`: a consumer runs a
+released version and moves when its pin moves, which is what makes "what is this repo running"
+answerable from its stub alone. `SelfInstall` asserts this repo's own stub pins a release like any
+other consumer.
+
+⚠️ **The accepted cost is that nothing exercises the edge.** While a canary tracked `@mainline`, a
+bad change met real work before any pinned consumer saw it — that is how the dark-dispatch race and
+the composite-action question were caught. With every repo pinned, the suite and a drill in
+`claude-team-example` are the only things standing between a merge and a release. Drill a
+structural change before tagging, not after.
+
+⚠️ **The release commit still never merges.** Its pins are `vN`; mainline's stay `mainline`, so the
+next release flips from a clean base. A `vN` on mainline in `team.yml`, the actions, the template or
+`rules/claude-team.md` is still a defect — the exception is `.github/workflows/claude.yml`, this
+repo's own stub, which pins a release in an ordinary PR after the tag exists.
 
 ⚠️ **A release is not finished when the tag is pushed.** `INSTALL.md` §0 is the returning
 consumer's path and `CHANGELOG.md` is what makes it answerable. A consumer has one question — *must

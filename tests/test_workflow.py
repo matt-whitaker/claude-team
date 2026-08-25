@@ -636,18 +636,21 @@ class ReleasePins(unittest.TestCase):
 
 
 class SelfInstall(unittest.TestCase):
-    """This repo consumes itself, and its stub is the ONE pin that must not move at release.
+    """This repo consumes itself, and its stub pins a release like every other consumer.
 
-    ReleasePins flips together on a release commit that is tagged and deliberately not merged.
-    `.github/workflows/claude.yml` lives on mainline permanently, so a `vN` written into it would
-    be a fifth pin nothing asserts — and mainline would run its own team on assets from an older
-    version of itself. A blanket mainline -> vN sweep across .github at release time is exactly
-    the plausible edit this catches."""
+    ⚠️ The stub is NOT one of ReleasePins' pins. Those flip on the release commit, which is tagged
+    and never merged; this file lives on mainline, so its pin moves in an ordinary PR after a tag
+    exists — the same bump every consumer makes.
 
-    def test_the_self_install_tracks_mainline(self):
+    ⚠️ The accepted cost: mainline runs its own team at the last release, not at its own HEAD, so
+    a change to hooks/ or team.yml is not exercised here until the next tag. That is the trade the
+    fleet made by locking every repo to a version; the suite and the drill repo are what catch a
+    bad change instead."""
+
+    def test_the_self_install_pins_a_release(self):
         import re
         ref = re.search(r"uses: matt-whitaker/claude-team/\.github/workflows/team\.yml@(\S+)", SELF).group(1)
-        self.assertEqual(ref, "mainline")
+        self.assertRegex(ref, r"^v\d", "the self-install pins a released tag like every consumer")
 
     def test_the_inputs_are_filled_in(self):
         self.assertNotIn("CHANGE-ME", SELF)

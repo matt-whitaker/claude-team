@@ -37,8 +37,7 @@ Then, in order:
    only pin a consumer holds — `TEAM_REF` lives inside the workflow and moves with the tag, so a
    consumer never edits it and must never be told to. ⚠️ **Re-fetch `.claude/rules/claude-team.md` from the
    new ref** (§2) and check its `team-ref` matches: the two are one fact in two places, and a
-   mismatch is exactly the half-done upgrade nothing else can see. ⚠️ A repo that deliberately
-   tracks `@mainline` skips the bump; see the release note in `CLAUDE.md` for which ones and why.
+   mismatch is exactly the half-done upgrade nothing else can see.
 
 3. **Reconcile the stub — do not recreate it.** Diff it against
    [`templates/consumer-stub.yml`](templates/consumer-stub.yml). Everything but the header comment,
@@ -112,9 +111,9 @@ Settle these before touching files; each is a judgment call about the target, no
 
 Copy [`templates/consumer-stub.yml`](templates/consumer-stub.yml) to the target's
 `.github/workflows/claude.yml`, set the inputs, and **pin the `uses:` ref to the newest `vN`
-tag** (`git ls-remote --tags` here answers which). One repo in the fleet deliberately tracks
-`@mainline` to find breakage first; every other consumer pins, and picks up fixes by bumping
-the pin in a one-line PR when a release is cut.
+tag** (`git ls-remote --tags` here answers which). Every repo pins a release and picks up fixes by
+bumping the pin in a one-line PR when a new one is cut — nothing tracks `@mainline`, so what a repo
+runs is answerable from its stub alone.
 
 ⚠️ **Do not trim the `permissions:` block, even if the target seems not to need parts of it.**
 A called workflow cannot request permissions its caller didn't grant — the stub's block is the

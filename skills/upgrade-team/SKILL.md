@@ -17,8 +17,6 @@ grep -o 'team\.yml@[^ ]*' <target>/.github/workflows/claude.yml   # installed
 git ls-remote --tags https://github.com/matt-whitaker/claude-team  # available
 ```
 
-A repo that deliberately tracks `@mainline` (a canary, a drill target) has no pin to bump — for it,
-"upgrade" is only the re-copy half below.
 
 ## The order (INSTALL.md §0 is the detail)
 
