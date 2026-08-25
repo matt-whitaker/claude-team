@@ -18,7 +18,9 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** n/a — nothing has landed since `v4`.
+**Action required:** no — a policy change in this repo; consumers already pin.
+
+- **Every repo pins a release; nothing tracks `@mainline`.** The canary model is retired: brewdocs.beer, claude-team-example and this repo's own stub pinned the edge so a bad change met real work before any pinned consumer saw it. All of them pin `@vN` now, and what a repo runs is answerable from its stub alone. ⚠️ The cost, accepted: nothing exercises the edge, so the suite and a drill in claude-team-example are all that stand between a merge and a release — drill a structural change **before** tagging. `SelfInstall` now asserts this repo's stub names a `vN`.
 
 ## v4
 

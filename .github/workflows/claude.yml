@@ -1,16 +1,15 @@
 # claude-team CONSUMING ITSELF. The stub, frozen, exactly as templates/consumer-stub.yml ships it
 # — the only edits are the five inputs below and this note.
 #
-# ⚠️ THE `@ref` HERE IS PINNED TO `mainline` AND MUST STAY THERE. Every other consumer pins a
-# `vN` tag and bumps it in a one-line PR. This one cannot: release tooling flips the four pins it
-# knows about (TEAM_REF, the two composite-action refs, load-prompt's default, the template's) on a
-# commit that is tagged and DELIBERATELY NOT MERGED, so a `vN` written here would be a fifth pin
-# nothing asserts and nobody remembers — and mainline would run its own team on stale assets.
-# `SelfInstall` in tests/test_workflow.py asserts this file tracks `mainline` for that reason.
+# ⚠️ THE `@ref` HERE PINS A RELEASE, like every other consumer, and is bumped the same way: a
+# one-line PR after a tag exists. It is NOT one of the pins the release commit flips — those live
+# on a commit that is tagged and DELIBERATELY NOT MERGED, and this file lives on mainline.
+# `SelfInstall` in tests/test_workflow.py asserts it names a `vN`.
 #
-# ⚠️ A RUN HERE EXECUTES THE HOOKS AT `mainline`, NOT THE ONES IN THE CHECKOUT. Editing hooks/ on
-# a branch changes nothing about the run editing them; merging it changes the machinery for this
-# repo, for claude-team-example, and for every consumer tracking mainline at once.
+# ⚠️ A RUN HERE EXECUTES THE HOOKS AT THE PINNED TAG, NOT THE ONES IN THE CHECKOUT. Editing hooks/
+# on a branch changes nothing about the run editing them, and merging changes nothing here until
+# this pin is bumped — so a structural change is drilled in claude-team-example before a tag, not
+# discovered by this repo after one.
 # The whole consumer-side integration: this file, frozen, plus a .claude-team/ directory.
 # Triggers, run-name and concurrency live HERE — a called workflow's own run-name is ignored
 # and its workflow-level concurrency is unsupported.
@@ -65,7 +64,7 @@ jobs:
       pull-requests: write
       actions: read
       id-token: write
-    uses: matt-whitaker/claude-team/.github/workflows/team.yml@mainline
+    uses: matt-whitaker/claude-team/.github/workflows/team.yml@v4
     with:
       project_owner: matt-whitaker
       project_number: "9"
