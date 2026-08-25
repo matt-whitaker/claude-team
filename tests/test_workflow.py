@@ -189,7 +189,7 @@ class ReadmeDocumentsEveryInput(unittest.TestCase):
 
     def test_onboarding_points_at_the_table_rather_than_restating_it(self):
         root = pathlib.Path(__file__).resolve().parent.parent
-        onboarding = (root / "ONBOARDING.md").read_text()
+        onboarding = (root / "INSTALL.md").read_text()
         self.assertIn("Inputs and secrets", onboarding)
 
 
@@ -361,7 +361,7 @@ class TheRuntimesResolverActuallyRuns(unittest.TestCase):
 
 
 class TheReturningConsumerHasAPath(unittest.TestCase):
-    """⚠️ #39: ONBOARDING INSTALLED AND NEVER RE-INSTALLED. Every step was written for a fresh
+    """⚠️ #39: THE INSTALL RAN ONCE AND NEVER RE-RAN. Every step was written for a fresh
     target — §2 creates the stub, §3 creates overlays, §7 is a first-run drill — so a session
     pointed at an installed repo had no instruction for the case it was actually in, and the
     consumer half of an upgrade was never stated anywhere. "Upgrade" meant bump the ref and hope.
@@ -377,42 +377,42 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
     # unrelated test in it. Caught by running these against mainline: the intended assertion
     # failure arrived as `unittest.loader._FailedTest` with 40-odd other tests silently gone.
     def setUp(self):
-        missing = [f for f in ("ONBOARDING.md", "CHANGELOG.md", "CLAUDE.md")
+        missing = [f for f in ("INSTALL.md", "CHANGELOG.md", "CLAUDE.md")
                    if not (self.ROOT / f).exists()]
         self.assertFalse(missing, f"required file(s) absent: {missing}")
-        self.ONBOARDING = (self.ROOT / "ONBOARDING.md").read_text()
+        self.INSTALL = (self.ROOT / "INSTALL.md").read_text()
         self.CHANGELOG = (self.ROOT / "CHANGELOG.md").read_text()
         self.CLAUDEMD = (self.ROOT / "CLAUDE.md").read_text()
 
     def test_the_upgrade_path_comes_before_the_install_steps(self):
         """⚠️ A returning reader must not have to read §1-§7 to discover they are in the wrong
         place — §3 would overwrite an overlay carrying the repo's whole personality."""
-        upgrade = self.ONBOARDING.index("## 0. Already installed?")
-        first_install_step = self.ONBOARDING.index("## 1. Decide the inputs")
+        upgrade = self.INSTALL.index("## 0. Already installed?")
+        first_install_step = self.INSTALL.index("## 1. Decide the inputs")
         self.assertLess(upgrade, first_install_step)
 
     def test_the_install_steps_are_signposted_as_not_for_a_returning_reader(self):
-        self.assertRegex(self.ONBOARDING, r"ALREADY INSTALLED.*§0")
+        self.assertRegex(self.INSTALL, r"ALREADY INSTALLED.*§0")
 
     def test_the_case_is_detected_from_the_pin_not_a_new_number(self):
         """⚠️ Copying claude-code's revision integer would be wrong: it needed one because its
         install target is a session's knowledge and nothing else numbered it. Here the pin already
         is the version, and a second number beside it invents a fact that exists."""
-        self.assertIn("the pin *is* the signal", self.ONBOARDING)
-        self.assertIn("git ls-remote --tags", self.ONBOARDING)
+        self.assertIn("the pin *is* the signal", self.INSTALL)
+        self.assertIn("git ls-remote --tags", self.INSTALL)
 
     def test_the_consumer_is_never_told_to_edit_TEAM_REF(self):
         """It lives inside the workflow and moves with the tag. A consumer holds exactly one pin."""
-        section = self.ONBOARDING[
-            self.ONBOARDING.index("## 0."):self.ONBOARDING.index("## 1.")]
+        section = self.INSTALL[
+            self.INSTALL.index("## 0."):self.INSTALL.index("## 1.")]
         self.assertIn("only pin a consumer holds", section)
 
     def test_the_pin_cannot_carry_labels_and_the_path_says_so(self):
         """⚠️ THE HALF NO VERSION NUMBER REACHES. Labels live in GitHub, not the clone, so no ref
         bump has ever touched them — and the one step already written to be idempotent is the one
         that drifted, because nothing told anyone to re-run it."""
-        section = self.ONBOARDING[
-            self.ONBOARDING.index("## 0."):self.ONBOARDING.index("## 1.")]
+        section = self.INSTALL[
+            self.INSTALL.index("## 0."):self.INSTALL.index("## 1.")]
         self.assertIn("unconditionally", section)
         for carried in ("label", "board", "settings"):
             with self.subTest(item=carried):
@@ -421,8 +421,8 @@ class TheReturningConsumerHasAPath(unittest.TestCase):
     def test_the_overlay_wins_over_a_tightened_base_rule(self):
         """⚠️ Measured, not hypothetical: the Writer's scope was narrowed in the base and two
         consumer overlays went on granting what had just been removed."""
-        section = self.ONBOARDING[
-            self.ONBOARDING.index("## 0."):self.ONBOARDING.index("## 1.")]
+        section = self.INSTALL[
+            self.INSTALL.index("## 0."):self.INSTALL.index("## 1.")]
         self.assertIn("composes *after* the base", section)
 
     def test_every_changelog_version_states_whether_to_act(self):
@@ -485,7 +485,7 @@ class TheRuleASessionReads(unittest.TestCase):
     def setUp(self):
         self.RULE = (self.ROOT / "rules/claude-team.md").read_text()
         self.CLAUDEMD = (self.ROOT / "CLAUDE.md").read_text()
-        self.ONBOARDING = (self.ROOT / "ONBOARDING.md").read_text()
+        self.INSTALL = (self.ROOT / "INSTALL.md").read_text()
 
     @staticmethod
     def _levels(text):
@@ -495,13 +495,13 @@ class TheRuleASessionReads(unittest.TestCase):
         return [r.split("|")[1].strip() for r in table.splitlines()[2:]]
 
     def test_it_records_the_PIN_rather_than_inventing_a_version(self):
-        """⚠️ THE DECISION THIS COULD HAVE COLLIDED WITH. ONBOARDING already refuses a revision
+        """⚠️ THE DECISION THIS COULD HAVE COLLIDED WITH. INSTALL already refuses a revision
         integer because `the pin *is* the signal`. `team-ref` is not a second number — it is that
         pin, written where a session reads instead of where a workflow does, which is why the two
         are set in one step and why disagreement is a defect rather than a version skew."""
         self.assertRegex(self.RULE, r"\*\*team-ref: \S+\*\*")
-        self.assertIn("the pin *is* the signal", self.ONBOARDING)
-        self.assertIn("team-ref", self.ONBOARDING)
+        self.assertIn("the pin *is* the signal", self.INSTALL)
+        self.assertIn("team-ref", self.INSTALL)
 
     def test_its_hierarchy_cannot_drift_from_CLAUDE_md(self):
         """⚠️ A third statement of the same facts is a third thing that drifts, and prose review
@@ -654,6 +654,38 @@ class SelfInstall(unittest.TestCase):
         for key in ("on:", "issues:", "issue_comment:", "pull_request:", "run-name:", "concurrency:"):
             self.assertIn(key, SELF, key)
 
+class HarnessFoldedIn(unittest.TestCase):
+    """claude-harness merged into claude-team: the session rule and its skills ship from here.
+    A dangling `claude-harness` reference, or a rename left half-done, is what these catch."""
+
+    def test_both_rule_files_ship(self):
+        for name in ("claude-team.md", "claude-session.md"):
+            self.assertTrue((ROOT / "rules" / name).exists(), name)
+
+    def test_the_session_rule_versions_independently_and_names_the_team(self):
+        r = (ROOT / "rules/claude-session.md").read_text()
+        self.assertRegex(r, r"session-rule-revision: \d+",
+                         "the session rule keeps its own revision, distinct from the workflow pin")
+        self.assertNotIn("harness-rule-revision", r)
+        self.assertNotIn("claude-harness", r,
+                         "every self-reference must name claude-team now, not the retired repo")
+
+    def test_the_moved_skills_point_at_the_team(self):
+        for name in ("handoff", "take-on-story", "upgrade-team", "shape-story", "diagnose-run"):
+            self.assertTrue((ROOT / "skills" / name / "SKILL.md").exists(), name)
+        self.assertNotIn("claude-harness", (ROOT / "skills/take-on-story/SKILL.md").read_text())
+        self.assertNotIn("claude-harness", (ROOT / "skills/handoff/SKILL.md").read_text())
+
+    def test_the_runbook_renamed_and_nothing_points_at_the_old_name(self):
+        self.assertTrue((ROOT / "INSTALL.md").exists())
+        self.assertFalse((ROOT / "ONBOARDING.md").exists())
+
+    def test_the_install_copies_both_rules(self):
+        install = (ROOT / "INSTALL.md").read_text()
+        self.assertIn("claude-team.md", install)
+        self.assertIn("claude-session.md", install)
+
+
 class TheCascadeIsOneUnit(unittest.TestCase):
     """The cascade's mint+dispatch was three copy-pasted step-pairs; it is one composite action
     now, called wherever a wave is dispatched. The isolation is the point — the workflow core
@@ -687,7 +719,7 @@ class CanonicalLabels(unittest.TestCase):
         import json
         root = pathlib.Path(__file__).resolve().parent.parent
         self.labels = json.load(open(root / "templates/labels.json"))
-        self.onboarding = (root / "ONBOARDING.md").read_text()
+        self.onboarding = (root / "INSTALL.md").read_text()
 
     def test_every_label_has_a_colour_and_a_description(self):
         for l in self.labels:
