@@ -151,7 +151,9 @@ class ReadmeDocumentsEveryInput(unittest.TestCase):
         root = pathlib.Path(__file__).resolve().parent.parent
         self.readme = (root / "README.md").read_text()
         self.secrets = set(re.findall(r"secrets\.([A-Z_]+)", TEAM)) - {"GITHUB_TOKEN"}
-        self.vars = set(re.findall(r"vars\.([A-Z_]+)", TEAM))
+        # A repo variable can be read in team.yml directly, or wired at the stub into an input —
+        # the driver switch is the latter, so both surfaces count as "the workflow reads it".
+        self.vars = set(re.findall(r"vars\.([A-Z_]+)", TEAM + STUB))
         self.inputs = set(re.findall(r"^      ([a-z_]+):$", TEAM.split("jobs:")[0], re.M))
         self.assertIn("## Inputs and secrets", self.readme, "the reference section is gone")
         self.section = self.readme.split("## Inputs and secrets")[1]

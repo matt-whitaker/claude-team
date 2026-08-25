@@ -70,6 +70,8 @@ jobs:
       project_owner: matt-whitaker
       project_number: "9"
       allowed_bots: ""
+      # The driver switch — session-driven by default; set CLAUDE_TEAM_DRIVER to `cascade` to opt in.
+      driver: ${{ vars.CLAUDE_TEAM_DRIVER }}
       node: false
       browser: false
       # ⚠️ This repo is stdlib Python and its gate is `python3 -m unittest`. It is also

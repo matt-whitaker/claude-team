@@ -31,6 +31,10 @@ inputs:
     description: The consumer's `allowed_bots` input, verbatim. Empty means dark — the hook exits with a notice and adds no label.
     required: false
     default: ''
+  driver:
+    description: '`cascade` opts this repo into the App cascade (auto-dispatch on). Any other value (default) means session-driven — the cascade stands down and dispatches nothing.'
+    required: false
+    default: ''
   app-id:
     description: The dispatch App id (secret), or empty.
     required: false
@@ -45,7 +49,7 @@ runs:
   steps:
     - name: Mint the dispatch token
       id: mint
-      if: inputs.enabled == 'true'
+      if: inputs.enabled == 'true' && inputs.driver == 'cascade'
       continue-on-error: true
       uses: actions/create-github-app-token@v2
       with:
@@ -60,4 +64,5 @@ runs:
         STORY: ${{ inputs.story }}
         HAVE_SECRETS: ${{ inputs.app-id != '' && inputs.private-key != '' }}
         ALLOWED_BOTS: ${{ inputs.allowed_bots }}
+        DRIVER: ${{ inputs.driver }}
       run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"

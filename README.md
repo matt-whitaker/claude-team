@@ -102,6 +102,7 @@ not happen, never as a failure.
 | `node` | no | your call — `true` runs `npm ci` before author runs |
 | `browser` | no | your call — `true` installs the Playwright chromium |
 | `runtimes` | no | **your repo's gate** — the commands an author must be able to run. Defaults to `npm,npx,node` |
+| `driver` | no | **the drive switch** — `cascade` opts into auto-dispatch; the default is session-driven (a session advances the waves). Wire it to a repo variable to toggle in the UI |
 
 ⚠️ Name the App in `allowed_bots` **explicitly**. A wildcard lets any external App invoke the
 action with a prompt it controls.
@@ -110,6 +111,18 @@ action with a prompt it controls.
 `bundle`, and so on. Each entry becomes a `Bash(<name>:*)` grant for the four authoring roles, and
 they hold no other runtime. An author that cannot run your gate still produces the change; it just
 cannot verify it, and says so in its report rather than failing — which is easy to miss.
+
+⚠️ **`driver` is the drive switch, and the default is the session.** A story advances across its
+tasks by one of two drivers: a **session** (the default — a human or a `take-on-story` session
+labels each wave) or the **App cascade** (opt-in — `dispatch-next.py` labels the next wave when a
+task closes). Auto-dispatch is the thing that starts runs on its own, so it is not the default: a
+repo turns it on with `driver: cascade`, which also needs the App installed, its secrets set and its
+bot in `allowed_bots`. Any other value — unset, `session`, a typo — is session-driven, so a
+misconfiguration suppresses auto-dispatch rather than starting runs nobody asked for. Wire it to a
+variable — `driver: ${{ vars.CLAUDE_TEAM_DRIVER }}` in your stub — and flip
+`CLAUDE_TEAM_DRIVER` to `cascade` in *Settings → Secrets and variables → Actions → Variables* with
+no PR. `allowed_bots` is separate: it is the actor-guard admission list, and the cascade needs both
+it and `driver: cascade`.
 
 ### Secrets — *Settings → Secrets and variables → Actions*
 

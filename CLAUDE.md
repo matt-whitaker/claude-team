@@ -290,11 +290,16 @@ story's PR, with every task's diff accumulated. A `push:` trigger restores it an
 ## How a story moves
 
 ⚠️ **TWO DRIVERS ADVANCE A STORY ACROSS ITS TASKS, AND THE CONSUMER DECLARES WHICH.** A wave ends
-when a task closes; something then labels the next wave. That something is either the **App
-cascade** (`allowed_bots` names a bot — `dispatch-next.py` mints a token and adds the label) or a
-**human/session driver** (`allowed_bots: ""` — the maintainer's gesture, or a session running
-`take-on-story`, adds it). Neither is the default: the empty `allowed_bots` is as deliberate a
-choice as a named one, and `dispatch-next.py` exits quietly on it. The cascade lives in one place,
+when a task closes; something then labels the next wave. That something is a **session by default** (the maintainer's gesture, or a session running
+`take-on-story`, labels each wave) — the **App cascade** is opt-in. ⚠️ **The `driver` input is the
+switch, the default is the session, and it is meant to be a repo variable.** Auto-dispatch is what
+starts runs unattended, so it is the opt-in half: `driver: cascade` turns it on (and needs the App
+installed, its secrets set and its bot in `allowed_bots`); anything else — unset, `session`, a typo
+— is session-driven, dispatching nothing. That default is the safe one: a misconfiguration
+suppresses auto-dispatch rather than starting runs nobody asked for. ⚠️ `allowed_bots` is a separate
+control — the actor-guard admission list — and the cascade needs both it and `driver: cascade`;
+neither alone starts it. A consumer wires `driver: ${{ vars.CLAUDE_TEAM_DRIVER }}`, so the toggle is
+a variable in the UI, not a PR. The cascade lives in one place,
 the `dispatch-next` composite action, called at the three sites a wave can start; the rest of the
 workflow is driver-agnostic — it routes and runs one role whoever labelled the trigger.
 
