@@ -18,7 +18,15 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
-**Action required:** no — nothing to configure, but bare mentions behave differently.
+**Action required:** yes, to adopt the new layer — one copy step per consumer; nothing breaks
+without it.
+
+- **claude-team now ships law and procedure for consumers' `.claude/`.** `templates/settings/`
+  is a settings fragment plus `guard-push.py` — harness-enforced: no default-branch push, no
+  force-push, no `gh pr merge`, from any session in the repo. `skills/` ships `shape-story` and
+  `diagnose-run`. Install is a verbatim copy (ONBOARDING §3); re-copying is the upgrade. A
+  committed skill or hook is maintainer-owned law — reviewed merge is the governance, per the
+  epic #78 drills.
 
 - **A dark cascade no longer dispatches.** `allowed_bots: ""` now stops `dispatch-next.py`
   outright, whatever the App secrets say — previously a dark repo with secrets set dispatched a

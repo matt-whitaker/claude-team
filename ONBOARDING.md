@@ -56,6 +56,8 @@ Then, in order:
 
 5. **Re-run everything the pin cannot carry — unconditionally, every time.** It is idempotent and
    cheap, and this is the half a version number can never express:
+   - **The `.claude/` install** — re-copy the settings fragment, guard, and skills from §3;
+     like the labels, no ref bump has ever touched a consumer's committed copies.
    - **§4's label loop.** ⚠️ Labels live in GitHub, not in the clone, so no ref bump has ever
      touched them. It is the one step already written to be idempotent and it still drifted,
      because nothing told anyone to re-run it.
@@ -152,6 +154,29 @@ weight: [`claude-team-example`](https://github.com/matt-whitaker/claude-team-exa
 annotated for an audience), `brewdocs.beer-kb` (a research-led data repo: its Researcher overlay
 redefines findings as file/field/current/proposed/source), `brewdocs.beer` (a full application).
 Nothing in the base prompts names any repo — if an overlay only restates the base, delete it.
+
+### The law and the skills — `.claude/`
+
+Two more installs land beside the overlay, both copied verbatim from this repo and both
+**maintainer-owned law once committed** (a skill's frontmatter can grant tools past a session
+allowlist, and a settings hook executes on whatever machine opens the repo — reviewed merge is
+the entire governance):
+
+```bash
+mkdir -p .claude/hooks .claude/skills
+cp <claude-team>/templates/settings/settings.json .claude/settings.json
+cp <claude-team>/templates/settings/hooks/guard-push.py .claude/hooks/
+cp -R <claude-team>/skills/* .claude/skills/
+```
+
+- **The settings fragment + `guard-push.py`** are harness-enforced: no push to the default
+  branch, no force-push, no `gh pr merge`, from any session in this repo — the same rules the
+  prompts state, made law (E17). ⚠️ A repo that already has a `.claude/settings.json` merges the
+  `hooks` block by hand; the fragment is the reference, and this install must not clobber.
+- **The skills** (`shape-story`, `diagnose-run`) are procedure — discoverable by any session and
+  by CI runs. claude-harness ships the session-conduct skills separately; these are the
+  backlog's.
+- Re-copying is the upgrade, like the label loop: idempotent, and drift is a diff away.
 
 ## 4. The labels
 
