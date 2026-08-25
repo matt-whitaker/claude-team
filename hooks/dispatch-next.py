@@ -39,6 +39,23 @@ import team
 STORY = os.environ.get("STORY", "")
 HAVE_SECRETS = os.environ.get("HAVE_SECRETS", "").lower() == "true"
 ALLOWED_BOTS = os.environ.get("ALLOWED_BOTS", "").strip()
+DRIVER = os.environ.get("DRIVER", "").strip().lower()
+
+# ⚠️ THE DEFAULT DRIVER IS THE SESSION, AND THE CASCADE IS OPT-IN. Auto-dispatch is the thing with
+# a blast radius — it starts runs on its own — so it is not the default: a repo drives by session
+# (a human or a `take-on-story` session labels each wave) unless it explicitly asks for the App
+# cascade with `driver: cascade`. A repo variable carries the choice, flipped in the UI. Any value
+# that is not `cascade` — unset, empty, `session`, a typo — means session, which is the safe
+# outcome: a misconfiguration suppresses auto-dispatch rather than starting runs nobody asked for.
+# Checked FIRST, because it overrides everything below — a session driving does not care whether a
+# token could be minted.
+if DRIVER != "cascade":
+    print(
+        "::notice::dispatch suppressed — this repo is session-driven, the default. A session "
+        "advances the waves; the App cascade is opt-in. Set the driver variable to `cascade` to "
+        "turn on auto-dispatch."
+    )
+    raise SystemExit(0)
 
 # ⚠️ [E7] THE DRIVER DECLARATION GATES DISPATCH, NOT THE SECRETS. Gating on token mintability read
 # a proxy: secrets present meant "cascade wanted", and it does not — a consumer with the App
@@ -52,9 +69,9 @@ ALLOWED_BOTS = os.environ.get("ALLOWED_BOTS", "").strip()
 # still the only shape a human must fix.
 if not ALLOWED_BOTS:
     print(
-        "::notice::cascade dark — no bot is admitted (`allowed_bots` is empty). The next task is "
-        "the driver's to label: the maintainer's gesture, or a session driving the story. This is "
-        "the configured-off state, not a failure."
+        "::error::`driver: cascade` selected but `allowed_bots` is empty — no bot is admitted, so "
+        "a dispatched run would be rejected at the actor guard. Name the dispatch App's slug in "
+        "`allowed_bots`, or set the driver back to session."
     )
     raise SystemExit(0)
 

@@ -131,6 +131,10 @@ on:
         description: Comma-separated bot logins admitted at the model steps (the dispatch App). Empty admits none.
         type: string
         default: ""
+      driver:
+        description: '`cascade` opts into the App cascade (auto-dispatch). The default is session-driven — a session advances the waves and the cascade stands down. A consumer wires this to a repo variable so it toggles in the UI without a PR.'
+        type: string
+        default: ""
       node:
         description: Set up Node with npm cache and run npm ci before author runs
         type: boolean
@@ -455,6 +459,7 @@ jobs:
           story: ${{ steps.route.outputs.story }}
           repo: ${{ github.repository }}
           allowed_bots: ${{ inputs.allowed_bots }}
+          driver: ${{ inputs.driver }}
           app-id: ${{ secrets.DISPATCH_APP_ID }}
           private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
 
@@ -645,6 +650,7 @@ jobs:
           story: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
           repo: ${{ github.repository }}
           allowed_bots: ${{ inputs.allowed_bots }}
+          driver: ${{ inputs.driver }}
           app-id: ${{ secrets.DISPATCH_APP_ID }}
           private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
 
@@ -1741,6 +1747,7 @@ jobs:
           story: ${{ needs.delegate.outputs.story }}
           repo: ${{ github.repository }}
           allowed_bots: ${{ inputs.allowed_bots }}
+          driver: ${{ inputs.driver }}
           app-id: ${{ secrets.DISPATCH_APP_ID }}
           private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
 

@@ -57,6 +57,13 @@ jobs:
       project_owner: CHANGE-ME
       project_number: "0"
       allowed_bots: ""
+      # ⚠️ The DRIVER SWITCH, default session. Left as-is (variable unset) a SESSION advances the
+      # story's waves and nothing auto-dispatches. Set the repo variable CLAUDE_TEAM_DRIVER to
+      # `cascade` — in Settings → Secrets and variables → Actions → Variables, no PR — to opt into
+      # the App cascade; that also needs the App installed, its secrets set, and its slug in
+      # `allowed_bots` above. Flip the variable back to `session` (or clear it) to hand the repo
+      # to a session again.
+      driver: ${{ vars.CLAUDE_TEAM_DRIVER }}
       node: false
       browser: false
       # The commands an authoring role may run, so it can execute THIS repo's gate.

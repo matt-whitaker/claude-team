@@ -18,7 +18,17 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 ## Unreleased
 
-**Action required:** yes, to adopt the new layer — one copy step per consumer; nothing breaks
+**Action required:** yes for App-driven repos — set `CLAUDE_TEAM_DRIVER` to `cascade` to keep the cascade; session-driven repos need nothing.
+
+- ⚠️ **The default driver is now the SESSION; the App cascade is opt-in. App-driven repos must
+  act.** A `driver` input decides who advances a story's waves. Its default — and the default of
+  the repo variable `CLAUDE_TEAM_DRIVER` it is wired to — is **session-driven**: a human or a
+  `take-on-story` session labels each wave, and **nothing auto-dispatches**. A repo that wants the
+  App cascade sets `CLAUDE_TEAM_DRIVER` to `cascade` (Settings → Variables, no PR). **A repo that
+  relied on the cascade and does nothing will go quiet** — its next task will not start itself.
+  Set the variable to `cascade` to restore it. `allowed_bots` alone no longer turns the cascade
+  on; the cascade needs both `driver: cascade` and a bot admitted. The safe default was the point:
+  auto-dispatch starts runs unattended, so a misconfiguration now suppresses it rather than firing.
 
 - **The cascade is one composite action, not three inline copies.** `dispatch-next` (mint token +
   run the hook) was copy-pasted into the delegate, architect and authors jobs; it is

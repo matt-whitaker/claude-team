@@ -18,7 +18,7 @@ def issues(body, tasks, labelled=()):
 
 class DispatchNext(HookCase):
     def dispatch(self, body, tasks, labelled=(), extra=None):
-        env = {"STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot",
+        env = {"STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot", "DRIVER": "cascade",
                "STUB_ISSUES": issues(body, tasks, labelled)}
         env.update(extra or {})
         return self.run_hook("dispatch-next.py", env)
@@ -54,22 +54,47 @@ class DispatchNext(HookCase):
         data["11"]["labels"] = ["@claude/complete"]
         r = self.run_hook("dispatch-next.py",
                           {"STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot",
-                           "STUB_ISSUES": data})
+                           "DRIVER": "cascade", "STUB_ISSUES": data})
         self.assertEqual(self.dispatched(r), ["11"])
 
-    def test_dark_declaration_stops_dispatch_even_with_secrets_and_token(self):
-        """#82, measured twice on fantasy-football #84: secrets present, token mintable, and the
-        consumer declared no bot — dispatch must not fire, or the dead run eats the label the
-        real driver needs."""
-        r = self.dispatch(BODY_WAVES, TASKS4, extra={"ALLOWED_BOTS": "", "HAVE_SECRETS": "true"})
-        self.assertEqual(self.dispatched(r), [], "a dark repo must add no labels")
-        self.assertIn("cascade dark", r.stdout)
-        self.assertIn("notice", r.stdout, "declared-off is quiet, never an error")
+    def test_the_default_is_session_so_dispatch_is_suppressed(self):
+        """Session is the default: an unset driver stands the cascade down even with the App fully
+        configured — bot admitted, secrets present, token mintable. Nothing auto-dispatches unless
+        a repo opts into the cascade."""
+        r = self.dispatch(BODY_WAVES, TASKS4,
+                          extra={"ALLOWED_BOTS": "some-bot", "HAVE_SECRETS": "true", "DRIVER": ""})
+        self.assertEqual(self.dispatched(r), [], "the default adds no labels")
+        self.assertIn("session-driven, the default", r.stdout)
+        self.assertIn("notice", r.stdout, "the default is quiet, never an error")
+
+    def test_a_typo_in_the_driver_is_session_not_cascade(self):
+        """Any value that is not `cascade` is session — a misconfiguration suppresses auto-dispatch
+        rather than starting runs nobody asked for."""
+        r = self.dispatch(BODY_WAVES, TASKS4, extra={"ALLOWED_BOTS": "b", "DRIVER": "cascde"})
+        self.assertEqual(self.dispatched(r), [])
+
+    def test_cascade_is_opt_in_and_then_it_drives(self):
+        r = self.dispatch(BODY_WAVES, TASKS4,
+                          extra={"ALLOWED_BOTS": "some-bot", "DRIVER": "cascade"})
+        self.assertEqual(self.dispatched(r), ["12", "13"], "driver: cascade turns the cascade on")
+
+    def test_cascade_selected_with_no_bot_is_a_loud_error(self):
+        r = self.dispatch(BODY_WAVES, TASKS4, extra={"ALLOWED_BOTS": "", "DRIVER": "cascade"})
+        self.assertEqual(self.dispatched(r), [])
+        self.assertIn("::error::", r.stdout, "opted into the cascade with no bot admitted")
+
+    def test_cascade_opted_in_but_no_bot_admitted_adds_nothing(self):
+        """Opting into the cascade with an empty allowed_bots is a misconfiguration: a dispatched
+        run would be rejected at the actor guard, so the hook adds no label and says why loudly."""
+        r = self.dispatch(BODY_WAVES, TASKS4,
+                          extra={"ALLOWED_BOTS": "", "HAVE_SECRETS": "true", "DRIVER": "cascade"})
+        self.assertEqual(self.dispatched(r), [], "no bot admitted means no dispatch")
+        self.assertIn("::error::", r.stdout)
 
     def test_secrets_present_but_no_token_is_loud(self):
         r = self.run_hook("dispatch-next.py",
                           {"STORY": "10", "HAVE_SECRETS": "true", "GH_TOKEN": "",
-                           "ALLOWED_BOTS": "some-bot"})
+                           "ALLOWED_BOTS": "some-bot", "DRIVER": "cascade"})
         self.assertIn("::error::", r.stdout)
         self.assertIn("not INSTALLED", r.stdout)
 
@@ -88,7 +113,7 @@ HEADING_LINE = "**Sequencing.** Its tasks run in order: #11, then #12, then #14.
 class InertSequencing(HookCase):
     def dispatch(self, body, tasks=TASKS4):
         return self.run_hook("dispatch-next.py", {
-            "STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot",
+            "STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot", "DRIVER": "cascade",
             "STUB_ISSUES": issues(body, tasks)})
 
     def dispatched(self, r):

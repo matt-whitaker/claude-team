@@ -100,6 +100,13 @@ Settle these before touching files; each is a judgment call about the target, no
   builds nothing, so the first *author* run is where this surfaces.
 - **`browser`** — `true` only if authors must drive a running app to verify their work. Every
   author run then pays a chromium download, so a data or docs repo says `false`.
+- **`driver`** — the drive switch, wired to a variable rather than hard-set:
+  `driver: ${{ vars.CLAUDE_TEAM_DRIVER }}`. **The default is session-driven** — a human or a
+  session labels each wave, and nothing auto-dispatches. To turn on the App cascade, set the repo
+  variable `CLAUDE_TEAM_DRIVER` to `cascade` in *Settings → Variables* (no PR); that also needs the
+  dispatch App installed with its secrets, and its slug in `allowed_bots`. Leave the input wired
+  even for a session-driven repo — an unset variable is session, and the wiring is what makes the
+  switch a UI toggle rather than a code change later.
 
 ## 2. The stub
 
