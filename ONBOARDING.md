@@ -83,9 +83,10 @@ Settle these before touching files; each is a judgment call about the target, no
   and *what is the App named right now*. ⚠️ Ask for the name even if you think you know it —
   Apps get renamed, the slug is the identity, and a stub admitting a stale slug refuses every
   cascaded run at setup with *"Workflow initiated by non-human actor"*. The answer `""` is the
-  explicit decision to start **dark**: a finished task will not dispatch the next one, and the
-  maintainer's label gesture drives everything — a valid starting state, since the cascade is an
-  upgrade, not a prerequisite. ⚠️ The slug only *admits* the App: the cascade also needs the App
+  explicit decision to start **dark**: no dispatch fires whatever the secrets say, and the
+  driver's label gesture — the maintainer's, or a session driving the story — advances each
+  wave. A valid starting state, since the cascade is an upgrade, not a prerequisite. ⚠️ The slug
+  both *admits* the App at the model steps and *arms* dispatch; the cascade also needs the App
   installed on the repository and its secrets set (step 6). ⚠️ Name the App, never `*`: a
   wildcard admits any App on GitHub.
 - **`node`** — `true` if any author needs a runtime to install or build with; a repo whose gate

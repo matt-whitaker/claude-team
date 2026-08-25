@@ -463,6 +463,7 @@ jobs:
           REPO: ${{ github.repository }}
           STORY: ${{ steps.route.outputs.story }}
           HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
+          ALLOWED_BOTS: ${{ inputs.allowed_bots }}
         run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
 
       # ⚠️ THE ROUTING STEP WAS THE ONLY MODEL STEP HERE SHIPPING NO TRANSCRIPT, which is why #807
@@ -660,6 +661,7 @@ jobs:
           REPO: ${{ github.repository }}
           STORY: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
           HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
+          ALLOWED_BOTS: ${{ inputs.allowed_bots }}
         run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
 
       # ⚠️ AFTER file-sub-issues, which is what makes the children discoverable — this places
@@ -1763,6 +1765,7 @@ jobs:
           REPO: ${{ github.repository }}
           STORY: ${{ needs.delegate.outputs.story }}
           HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
+          ALLOWED_BOTS: ${{ inputs.allowed_bots }}
         run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
 
       # ⚠️ The primary call site. After each landing the hook checks whether that was the LAST

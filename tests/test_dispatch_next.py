@@ -18,7 +18,7 @@ def issues(body, tasks, labelled=()):
 
 class DispatchNext(HookCase):
     def dispatch(self, body, tasks, labelled=(), extra=None):
-        env = {"STORY": "10", "GH_TOKEN": "t",
+        env = {"STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot",
                "STUB_ISSUES": issues(body, tasks, labelled)}
         env.update(extra or {})
         return self.run_hook("dispatch-next.py", env)
@@ -53,12 +53,23 @@ class DispatchNext(HookCase):
         data = issues("x", [{"number": 11, "state": "open"}])
         data["11"]["labels"] = ["@claude/complete"]
         r = self.run_hook("dispatch-next.py",
-                          {"STORY": "10", "GH_TOKEN": "t", "STUB_ISSUES": data})
+                          {"STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot",
+                           "STUB_ISSUES": data})
         self.assertEqual(self.dispatched(r), ["11"])
+
+    def test_dark_declaration_stops_dispatch_even_with_secrets_and_token(self):
+        """#82, measured twice on fantasy-football #84: secrets present, token mintable, and the
+        consumer declared no bot — dispatch must not fire, or the dead run eats the label the
+        real driver needs."""
+        r = self.dispatch(BODY_WAVES, TASKS4, extra={"ALLOWED_BOTS": "", "HAVE_SECRETS": "true"})
+        self.assertEqual(self.dispatched(r), [], "a dark repo must add no labels")
+        self.assertIn("cascade dark", r.stdout)
+        self.assertIn("notice", r.stdout, "declared-off is quiet, never an error")
 
     def test_secrets_present_but_no_token_is_loud(self):
         r = self.run_hook("dispatch-next.py",
-                          {"STORY": "10", "HAVE_SECRETS": "true", "GH_TOKEN": ""})
+                          {"STORY": "10", "HAVE_SECRETS": "true", "GH_TOKEN": "",
+                           "ALLOWED_BOTS": "some-bot"})
         self.assertIn("::error::", r.stdout)
         self.assertIn("not INSTALLED", r.stdout)
 
@@ -77,7 +88,8 @@ HEADING_LINE = "**Sequencing.** Its tasks run in order: #11, then #12, then #14.
 class InertSequencing(HookCase):
     def dispatch(self, body, tasks=TASKS4):
         return self.run_hook("dispatch-next.py", {
-            "STORY": "10", "GH_TOKEN": "t", "STUB_ISSUES": issues(body, tasks)})
+            "STORY": "10", "GH_TOKEN": "t", "ALLOWED_BOTS": "some-bot",
+            "STUB_ISSUES": issues(body, tasks)})
 
     def dispatched(self, r):
         return [c["args"][1].split("/")[-2] for c in self.calls_matching(r, "labels")]

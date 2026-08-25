@@ -38,6 +38,25 @@ import team
 
 STORY = os.environ.get("STORY", "")
 HAVE_SECRETS = os.environ.get("HAVE_SECRETS", "").lower() == "true"
+ALLOWED_BOTS = os.environ.get("ALLOWED_BOTS", "").strip()
+
+# ⚠️ [E7] THE DRIVER DECLARATION GATES DISPATCH, NOT THE SECRETS. Gating on token mintability read
+# a proxy: secrets present meant "cascade wanted", and it does not — a consumer with the App
+# secrets set and `allowed_bots: ""` has declared a HUMAN or SESSION driver. This hook then
+# dispatched anyway, the run died at the host action's actor guard (the bot is not admitted), and
+# the dead dispatch had already consumed the front-door label — so the real driver's own label add
+# became a silent no-op. Measured twice in one story, fantasy-football #84 (issue #82): both
+# inter-wave transitions raced, both runs died in ~2s, both waves needed a hand re-arm.
+# An empty allowed_bots is the same configured-off state as no secrets, and stays the same quiet
+# notice. The loud error remains reserved for secrets-present-bots-admitted-no-token, which is
+# still the only shape a human must fix.
+if not ALLOWED_BOTS:
+    print(
+        "::notice::cascade dark — no bot is admitted (`allowed_bots` is empty). The next task is "
+        "the driver's to label: the maintainer's gesture, or a session driving the story. This is "
+        "the configured-off state, not a failure."
+    )
+    raise SystemExit(0)
 
 # ⚠️ THE MISSING TOKEN IS DIAGNOSED HERE, NOT GATED AWAY IN THE WORKFLOW. The dispatch step used
 # to require a non-empty token in its `if:`, so a mint that FAILED produced a silently skipped
