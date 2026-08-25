@@ -1,6 +1,6 @@
 # claude-harness
 
-**harness-rule-revision: 11** · from `matt-whitaker/claude-harness`
+**harness-rule-revision: 12** · from `matt-whitaker/claude-harness`
 
 ⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -154,6 +154,16 @@ what the backlog does; this section is only how the session conducts itself whil
   story and continues. If the last posted state is stale, that IS the diagnostic.
 - **The endgame is verified, not assumed.** After the last task closes, confirm the story's PR
   exists and says what landed; a missing PR is a diagnosis to run, never a silence to leave.
+- ⚠️ **A parked watcher is not a plan; arm a heartbeat beside it.** A watcher dies with its
+  session, and a dead driver halts a story silently. On taking a story, also arm a scheduled
+  re-check on a long interval (the watcher is the wake path; the heartbeat is the net). Each
+  heartbeat tick is the same move as any wake: reconcile the story from GitHub, advance what
+  moved, re-park what died. Driving several stories is one tick sweeping all of them, not one
+  heartbeat each.
+- **Resume is the heartbeat's move from zero.** A fresh session handed a mid-flight story reads
+  the posted state and continues; nothing about the previous driver's death needs diagnosing
+  first. What makes this work is the posting discipline above — protect it before optimizing
+  anything else.
 - ⚠️ **A driver never edits its own law mid-story.** Rules, skills, hooks, prompts — proposing a
   change is fine; landing one while driving under it is not.
 
