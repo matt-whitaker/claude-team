@@ -11,7 +11,7 @@ Three documents, and putting a fact in the wrong one is the commonest error:
 - **`CLAUDE.md`** — the rules, the platform constraints behind them, and the failures that shaped
   them. The audience is an agent or a maintainer about to change something.
 - **`README.md`** — what this package is and how a repo consumes it. Short, orienting, no traps.
-- **`ONBOARDING.md`** — the install runbook. A session pointed at it and a target repo must
+- **`INSTALL.md`** — the install runbook. A session pointed at it and a target repo must
   produce a working install **without further research**; anything it leaves to judgement has to
   say so explicitly.
 

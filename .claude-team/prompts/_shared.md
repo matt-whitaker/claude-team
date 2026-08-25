@@ -86,5 +86,5 @@ around it: "the front-door label", "the root role's handle". The same goes for a
 `@`-prefixed role handle you are describing rather than invoking.
 
 Match the file you are editing. `CLAUDE.md` is dense, ⚠️-marked and argues from evidence;
-`README.md` is short and orienting; `ONBOARDING.md` is a runbook a session executes without
+`README.md` is short and orienting; `INSTALL.md` is a runbook a session executes without
 further research. A fact in the wrong one of those three is the commonest error here.

@@ -71,7 +71,7 @@ deterministic next time.
 
 The consumer contract is a ~60-line stub calling the reusable workflow
 ([`templates/consumer-stub.yml`](templates/consumer-stub.yml), pinned to a `vN` tag) plus a
-`.claude-team/` directory holding your prompt overlays. [`ONBOARDING.md`](ONBOARDING.md) is the
+`.claude-team/` directory holding your prompt overlays. [`INSTALL.md`](INSTALL.md) is the
 runbook — point a Claude session at it together with a target repo and it walks the whole
 install: inputs, stub, overlays, labels, the maintainer's secrets, and the drill that proves it.
 [`claude-team-example`](https://github.com/matt-whitaker/claude-team-example) is a living,

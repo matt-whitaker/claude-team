@@ -1,4 +1,4 @@
-# ONBOARDING — installing the team into a repo
+# INSTALL — putting the team into a repo
 
 This is a runbook for a Claude session. Point one here together with a **target repo** and it
 should produce a working install without further research. It is the sequence that onboarded
@@ -134,12 +134,18 @@ that repo what the team is. Install the rule that does, from the same tag you ju
 mkdir -p <target>/.claude/rules
 curl -fsSL https://raw.githubusercontent.com/matt-whitaker/claude-team/vN/rules/claude-team.md \
   -o <target>/.claude/rules/claude-team.md
+curl -fsSL https://raw.githubusercontent.com/matt-whitaker/claude-team/vN/rules/claude-session.md \
+  -o <target>/.claude/rules/claude-session.md
 ```
 
-⚠️ **Set its `team-ref` to the ref you pinned above.** It is not a second version number — it is
-the pin, recorded where a session reads rather than where a workflow does, and it is why the two
-are written in one step. ⚠️ **A `team-ref` that disagrees with the `uses:` pin is a half-done
-upgrade**, and the only part of one a clone can detect on its own.
+Two rule files, both from this repo. `claude-team.md` says how the team's backlog works;
+`claude-session.md` says how a session conducts itself in any repo (the environment, the
+maintainer's conventions, the craft, driving a story). ⚠️ **Set `claude-team.md`'s `team-ref` to
+the ref you pinned above.** It is not a second version number — it is the pin, recorded where a
+session reads rather than where a workflow does. ⚠️ **A `team-ref` that disagrees with the `uses:`
+pin is a half-done upgrade**, the only part of one a clone can detect on its own.
+`claude-session.md` versions independently by `session-rule-revision` — it is not tied to the
+workflow pin, and a re-copy is what upgrades it.
 
 ⚠️ **It carries no role instruction.** A role is given `prompts/` at run time; a rule scopes by
 file path, never by who is running.
@@ -170,19 +176,21 @@ allowlist, and a settings hook executes on whatever machine opens the repo — r
 the entire governance):
 
 ```bash
-mkdir -p .claude/hooks .claude/skills
+mkdir -p .claude/hooks .claude/skills .claude/rules
 cp <claude-team>/templates/settings/settings.json .claude/settings.json
 cp <claude-team>/templates/settings/hooks/guard-push.py .claude/hooks/
 cp -R <claude-team>/skills/* .claude/skills/
+cp <claude-team>/rules/claude-team.md <claude-team>/rules/claude-session.md .claude/rules/
 ```
 
 - **The settings fragment + `guard-push.py`** are harness-enforced: no push to the default
   branch, no force-push, no `gh pr merge`, from any session in this repo — the same rules the
   prompts state, made law (E17). ⚠️ A repo that already has a `.claude/settings.json` merges the
   `hooks` block by hand; the fragment is the reference, and this install must not clobber.
-- **The skills** (`shape-story`, `diagnose-run`) are procedure — discoverable by any session and
-  by CI runs. claude-harness ships the session-conduct skills separately; these are the
-  backlog's.
+- **The skills** are procedure, discoverable by any session and by CI runs: `shape-story` and
+  `diagnose-run` (the backlog), `handoff` and `take-on-story` (session conduct), and `upgrade-team`
+  (this file's §0, as a skill). All ship from this one repo.
+- **The rules** are the two above, copied here as part of the same idempotent step.
 - Re-copying is the upgrade, like the label loop: idempotent, and drift is a diff away.
 
 ## 4. The labels

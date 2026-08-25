@@ -21,7 +21,7 @@ which `SelfInstall` pins there permanently. brewdocs.beer-kb also tracks `@mainl
 maintainer's call rather than by the rule. ⚠️ **A `vN` appearing anywhere on `mainline` is a
 defect** — the default branch is what the canaries run, so a pin flipped there stops it being one.
 
-⚠️ **A release is not finished when the tag is pushed.** `ONBOARDING.md` §0 is the returning
+⚠️ **A release is not finished when the tag is pushed.** `INSTALL.md` §0 is the returning
 consumer's path and `CHANGELOG.md` is what makes it answerable. A consumer has one question — *must
 I act?* — so every version heading carries an explicit `**Action required:**` line and a test
 asserts it. `no` is the commonest answer and the most valuable one.
@@ -89,7 +89,7 @@ line — `--json-schema` takes inline JSON wrapped in single quotes, and the arg
 line by line. The same applies to any comment: `claude_args: |` is a literal block scalar, so a
 `#` line inside it reaches the CLI as an argument. Comments go above the block.
 
-⚠️ **Label writes and board placement need a LOCAL session.** `ONBOARDING.md` §4's label loop and
+⚠️ **Label writes and board placement need a LOCAL session.** `INSTALL.md` §4's label loop and
 board placement cannot be done from a cloud session — say so and hand over the command rather than
 improvising.
 

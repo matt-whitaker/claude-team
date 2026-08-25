@@ -12,14 +12,15 @@ rather than leaving a reader to diff the tag themselves.
 impact from a merge log is exactly the work this file exists to remove, and it is done worst by
 whoever is trying to cut a tag. `## Unreleased` is always open for that reason.
 
-The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
+The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ---
 
 ## Unreleased
 
-**Action required:** yes for App-driven repos — set `CLAUDE_TEAM_DRIVER` to `cascade` to keep the cascade; session-driven repos need nothing.
+**Action required:** yes — App-driven repos set `CLAUDE_TEAM_DRIVER` to `cascade`; every consumer re-copies its `.claude/`, which now carries the session rule and skills as well.
 
+- ⚠️ **claude-harness is folded into claude-team; the session half now ships from one repo.** The session rule moves in as `rules/claude-session.md` (its own `session-rule-revision`, independent of the workflow pin), beside the existing `rules/claude-team.md`. The `handoff` and `take-on-story` skills move in too, and a new `upgrade-team` skill carries the upgrade flow. On upgrade, a consumer re-copies `.claude/rules/*` and `.claude/skills/*` from this repo. `ONBOARDING.md` is renamed `INSTALL.md`. The session rule arrives at `session-rule-revision: 13`, continuing the sequence it carried as `harness-rule-revision` — revisions 1–12 and their entries live in the retired repo's history, and everything they shipped is already installed fleet-wide.
 - ⚠️ **The default driver is now the SESSION; the App cascade is opt-in. App-driven repos must
   act.** A `driver` input decides who advances a story's waves. Its default — and the default of
   the repo variable `CLAUDE_TEAM_DRIVER` it is wired to — is **session-driven**: a human or a
@@ -47,7 +48,7 @@ without it.
 - **claude-team now ships law and procedure for consumers' `.claude/`.** `templates/settings/`
   is a settings fragment plus `guard-push.py` — harness-enforced: no default-branch push, no
   force-push, no `gh pr merge`, from any session in the repo. `skills/` ships `shape-story` and
-  `diagnose-run`. Install is a verbatim copy (ONBOARDING §3); re-copying is the upgrade. A
+  `diagnose-run`. Install is a verbatim copy (INSTALL §3); re-copying is the upgrade. A
   committed skill or hook is maintainer-owned law — reviewed merge is the governance, per the
   epic #78 drills.
 
