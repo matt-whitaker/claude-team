@@ -97,7 +97,8 @@ class AHandClosedTaskCanStillOpenTheStoryPR(HookCase):
     nothing ran. Third story in that repo to need its PR opened by hand."""
 
     TASK = {
-        "45": {"body": "Branch: `43-give-story-and-task-colours`\nRole: implementor"},
+        "45": {"body": "Branch: `43-give-story-and-task-colours`\nRole: implementor",
+               "parent": "43"},
         "43": {
             "title": "Give story and task their own colours",
             "kids": [{"number": 45, "title": "Recolour", "state": "closed"}],
@@ -146,6 +147,22 @@ class AHandClosedTaskCanStillOpenTheStoryPR(HookCase):
         self.assertEqual(r.returncode, 0)
         self.assertIn("not a task", r.stdout)
         self.assertFalse(self.calls_matching(r, "pr", "create"))
+
+    def test_a_branch_line_that_is_not_the_real_parent_opens_nothing(self):
+        """⚠️ #83: this trigger is reachable by anyone who can close an issue (its own author, on
+        a public repo), and the Branch line is body text they control. A crafted line naming a
+        real story's branch must not open that story's PR — the parent link is the settable-only
+        fact that gates it."""
+        crafted = {
+            "45": {"body": "Branch: `43-give-story-and-task-colours`", "parent": "999"},
+            "43": {"title": "Real story",
+                   "kids": [{"number": 44, "title": "the real task", "state": "closed"}]},
+        }
+        r = self.closed(issues=crafted)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("does not match the hierarchy", r.stdout)
+        self.assertFalse(self.calls_matching(r, "pr", "create"),
+                         "a claim not backed by real parentage must open nothing")
 
     def test_an_issue_with_no_branch_line_opens_nothing(self):
         """⚠️ Written negatively — "not a story, so proceed" — an unresolvable issue would open

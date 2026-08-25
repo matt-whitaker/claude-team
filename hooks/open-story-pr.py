@@ -55,6 +55,21 @@ if not BASE and ISSUE:
             f"{named or 'nothing'}. Nothing to open."
         )
         raise SystemExit(0)
+    # ⚠️ [E2] THE BRANCH LINE IS A CLAIM, NOT PROOF OF PARENTAGE. On a public repo the author of
+    # an issue can close their own with no collaborator rights, so this trigger is reachable by
+    # anyone — and the Branch line is body text they control. An issue whose line names a real
+    # story's branch would otherwise open that story's PR early. The parent link is state only the
+    # machinery (or a maintainer) can set, so verify the claimed story is the ACTUAL parent before
+    # acting on the claim. The ceiling without this is a premature PR, not code execution — the job
+    # holds no model step and `contents: read` — but a claim checked against a settable fact is the
+    # anti-pattern this package already names.
+    if team.parent(ISSUE) != owner:
+        print(
+            f"#{ISSUE}'s Branch line names story #{owner}, but its actual parent is "
+            f"{team.parent(ISSUE) or 'none'} — the claim does not match the hierarchy. "
+            "Nothing to open."
+        )
+        raise SystemExit(0)
     BASE = named
     print(f"#{ISSUE} closed by hand; checking its story's branch `{BASE}`.")
 

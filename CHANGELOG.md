@@ -19,6 +19,11 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 ## Unreleased
 
 **Action required:** yes, to adopt the new layer — one copy step per consumer; nothing breaks
+
+- **The closed-trigger PR-opener verifies real parentage.** open-story-pr.py now checks the
+  closed issue'''s actual parent matches the story its Branch line names, before opening a PR. The
+  trigger is reachable by any issue author; the Branch line is attacker-controllable body text,
+  the parent link is not. Ceiling was a premature PR, never code execution. No consumer action.
 without it.
 
 - **claude-team now ships law and procedure for consumers' `.claude/`.** `templates/settings/`
