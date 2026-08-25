@@ -10,6 +10,7 @@ TEAM = (ROOT / ".github/workflows/team.yml").read_text()
 WORKFLOW_AND_ACTIONS = TEAM + "\n".join(
     p.read_text() for p in sorted(ROOT.glob(".github/actions/*/action.yml")))
 ACTION = (pathlib.Path(__file__).resolve().parent.parent / ".github/actions/load-prompt/action.yml").read_text()
+RULE = (ROOT / "rules/claude-team.md").read_text()
 STUB = (pathlib.Path(__file__).resolve().parent.parent / "templates/consumer-stub.yml").read_text()
 SELF = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/claude.yml").read_text()
 
@@ -621,6 +622,17 @@ class ReleasePins(unittest.TestCase):
         self.assertEqual(action_refs, {team_ref})
         self.assertEqual(prompt_default, team_ref)
         self.assertEqual(stub_ref, team_ref)
+
+    def test_the_rules_team_ref_moves_with_them(self):
+        """The rule ships a `team-ref` that a consumer must set to its pin, and the shipped value
+        is what an installer copies — so it is a pin like the others and drifts the same way. It
+        sat at an older release for two versions because only its SHAPE was asserted, never its
+        value against the rest."""
+        import re
+        team_ref, _, _, _ = self.refs()
+        rule_ref = re.search(r"\*\*team-ref: (\S+)\*\*", RULE).group(1)
+        self.assertEqual(rule_ref, team_ref,
+                         "rules/claude-team.md's team-ref must flip with every other pin")
 
 
 class SelfInstall(unittest.TestCase):
