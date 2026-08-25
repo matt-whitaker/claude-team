@@ -1,0 +1,16 @@
+{
+  "$comment": "claude-team's harness-enforced law, installed as the consumer's .claude/settings.json alongside .claude/hooks/. A repo with its own settings.json merges the hooks block by hand — this file is the reference. The guard blocks default-branch pushes, force-pushes, and PR merges from any session; the same rules exist as prompt instructions, and the guard is what makes them enforcement (E17).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-push.py"
+          }
+        ]
+      }
+    ]
+  }
+}
