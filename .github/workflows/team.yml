@@ -448,23 +448,15 @@ jobs:
       # ⚠️ `dispatch-next.py` needs no change for this — it already finds the earliest incomplete
       # wave and skips anything already carrying the label, so "the first wave" is just the general
       # case with nothing closed yet.
-      - name: Mint the dispatch token
-        id: shaped-dispatch-token
-        if: always() && steps.route.outputs.dispatch == 'true'
-        continue-on-error: true
-        uses: actions/create-github-app-token@v2
+      - name: Dispatch the story's first wave
+        uses: matt-whitaker/claude-team/.github/actions/dispatch-next@mainline
         with:
+          enabled: ${{ steps.route.outputs.dispatch == 'true' }}
+          story: ${{ steps.route.outputs.story }}
+          repo: ${{ github.repository }}
+          allowed_bots: ${{ inputs.allowed_bots }}
           app-id: ${{ secrets.DISPATCH_APP_ID }}
           private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
-      - name: Dispatch the story's first wave
-        if: always() && steps.route.outputs.dispatch == 'true'
-        env:
-          GH_TOKEN: ${{ steps.shaped-dispatch-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          STORY: ${{ steps.route.outputs.story }}
-          HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
-          ALLOWED_BOTS: ${{ inputs.allowed_bots }}
-        run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
 
       # ⚠️ THE ROUTING STEP WAS THE ONLY MODEL STEP HERE SHIPPING NO TRANSCRIPT, which is why #807
       # could sit inert for days while every visible signal — green steps, a posted notice, a
@@ -646,23 +638,15 @@ jobs:
       # ⚠️ `dispatch-next.py` needs no change for this — it already finds the earliest incomplete
       # wave and skips anything already carrying the label, so "the first wave" is just the general
       # case with nothing closed yet.
-      - name: Mint the dispatch token
-        id: shaped-dispatch-token
-        if: always() && (needs.delegate.outputs.kind == 'story' || needs.delegate.outputs.kind == 'bug')
-        continue-on-error: true
-        uses: actions/create-github-app-token@v2
+      - name: Dispatch the story's first wave
+        uses: matt-whitaker/claude-team/.github/actions/dispatch-next@mainline
         with:
+          enabled: ${{ needs.delegate.outputs.kind == 'story' || needs.delegate.outputs.kind == 'bug' }}
+          story: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          repo: ${{ github.repository }}
+          allowed_bots: ${{ inputs.allowed_bots }}
           app-id: ${{ secrets.DISPATCH_APP_ID }}
           private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
-      - name: Dispatch the story's first wave
-        if: always() && (needs.delegate.outputs.kind == 'story' || needs.delegate.outputs.kind == 'bug')
-        env:
-          GH_TOKEN: ${{ steps.shaped-dispatch-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          STORY: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
-          HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
-          ALLOWED_BOTS: ${{ inputs.allowed_bots }}
-        run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
 
       # ⚠️ AFTER file-sub-issues, which is what makes the children discoverable — this places
       # them too, and sub_issues() would return nothing if it ran first.
@@ -1746,27 +1730,19 @@ jobs:
       # dispatch is a label add: the same @claude button the maintainer presses, so no new entry
       # path exists. ⚠️ `continue-on-error` + the token-empty gate below keep the cascade DARK
       # when the secrets are absent — the maintainer's manual gesture still works unchanged.
-      - name: Mint the dispatch token
-        id: dispatch-token
-        if: always() && steps.completion.outputs.closed == 'true'
-        continue-on-error: true
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.DISPATCH_APP_ID }}
-          private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
       # ⚠️ Gated on the landing having CLOSED the task: a failed run, an unlandable merge, or
       # work remaining all leave `closed` false, and the cascade halts right there — the failure
       # capture and report have already told the maintainer where to look. No retry loops: the
       # @claude label is the in-flight marker, and re-adding a present label fires nothing.
       - name: Dispatch the next task
-        if: always() && steps.completion.outputs.closed == 'true'
-        env:
-          GH_TOKEN: ${{ steps.dispatch-token.outputs.token }}
-          REPO: ${{ github.repository }}
-          STORY: ${{ needs.delegate.outputs.story }}
-          HAVE_SECRETS: ${{ secrets.DISPATCH_APP_ID != '' && secrets.DISPATCH_APP_PRIVATE_KEY != '' }}
-          ALLOWED_BOTS: ${{ inputs.allowed_bots }}
-        run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"
+        uses: matt-whitaker/claude-team/.github/actions/dispatch-next@mainline
+        with:
+          enabled: ${{ steps.completion.outputs.closed == 'true' }}
+          story: ${{ needs.delegate.outputs.story }}
+          repo: ${{ github.repository }}
+          allowed_bots: ${{ inputs.allowed_bots }}
+          app-id: ${{ secrets.DISPATCH_APP_ID }}
+          private-key: ${{ secrets.DISPATCH_APP_PRIVATE_KEY }}
 
       # ⚠️ The primary call site. After each landing the hook checks whether that was the LAST
       # task — every earlier landing just reports how many remain. The merge-path call is the net.

@@ -3,7 +3,12 @@ import pathlib
 import re
 import unittest
 
-TEAM = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/team.yml").read_text()
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+TEAM = (ROOT / ".github/workflows/team.yml").read_text()
+# Hooks are invoked from team.yml and from the composite actions it calls; an env var a hook
+# reads may be set at either, so the wiring check scans their union.
+WORKFLOW_AND_ACTIONS = TEAM + "\n".join(
+    p.read_text() for p in sorted(ROOT.glob(".github/actions/*/action.yml")))
 ACTION = (pathlib.Path(__file__).resolve().parent.parent / ".github/actions/load-prompt/action.yml").read_text()
 STUB = (pathlib.Path(__file__).resolve().parent.parent / "templates/consumer-stub.yml").read_text()
 SELF = (pathlib.Path(__file__).resolve().parent.parent / ".github/workflows/claude.yml").read_text()
@@ -119,8 +124,9 @@ class NoHookReadsAChannelNobodyFills(unittest.TestCase):
                 with self.subTest(hook=hook.name, var=name):
                     # `NAME:` in an env block, or `NAME=` inline on a run line.
                     self.assertRegex(
-                        TEAM, rf"(^|[\s;]){name}[:=]",
-                        f"{hook.name} reads {name}; team.yml never sets it, so it is always empty",
+                        WORKFLOW_AND_ACTIONS, rf"(^|[\s;]){name}[:=]",
+                        f"{hook.name} reads {name}; neither team.yml nor any composite action "
+                        "sets it, so it is always empty",
                     )
 
     def test_finish_pr_is_told_what_the_landing_landed(self):
@@ -595,7 +601,7 @@ class AHandClosedTaskHasATrigger(unittest.TestCase):
 class ReleasePins(unittest.TestCase):
     """Every pin that must move together at release time, asserted equal on every push.
 
-    The pins: TEAM_REF (what the jobs clone), the remote refs on the two composite actions
+    The pins: TEAM_REF (what the jobs clone), the remote refs on the composite actions
     inside team.yml, load-prompt's default ref, and the stub template's @ref. A release that
     moves one without the rest ships a workflow fetching assets from a different version of
     itself — the drift this suite exists to make impossible."""
@@ -645,6 +651,32 @@ class SelfInstall(unittest.TestCase):
         # so both belong here rather than upstream.
         for key in ("on:", "issues:", "issue_comment:", "pull_request:", "run-name:", "concurrency:"):
             self.assertIn(key, SELF, key)
+
+class TheCascadeIsOneUnit(unittest.TestCase):
+    """The cascade's mint+dispatch was three copy-pasted step-pairs; it is one composite action
+    now, called wherever a wave is dispatched. The isolation is the point — the workflow core
+    reads as event -> route -> run -> check, and the cascade is a single opt-in `uses:`."""
+
+    DISPATCH = (ROOT / ".github/actions/dispatch-next/action.yml").read_text()
+
+    def test_no_inline_mint_survives_in_the_workflow(self):
+        self.assertNotIn("create-github-app-token", TEAM,
+                         "the token mint belongs in the dispatch-next action, not inline in a job")
+
+    def test_every_dispatch_goes_through_the_action(self):
+        # three call sites: delegate's first wave, architect's first wave, authors' next task
+        self.assertEqual(
+            TEAM.count("actions/dispatch-next@"), 3,
+            "all three dispatch sites call the one action")
+
+    def test_the_mint_stays_fail_open(self):
+        # ⚠️ #1094: a mint that fails (App not installed) must still let dispatch-next.py run and
+        # diagnose it. Lose continue-on-error and that failure becomes a silently skipped step.
+        self.assertIn("continue-on-error: true", self.DISPATCH)
+
+    def test_the_hook_is_reached_where_the_job_staged_it(self):
+        self.assertIn("$RUNNER_TEMP/agent-bin/dispatch-next.py", self.DISPATCH)
+
 
 class CanonicalLabels(unittest.TestCase):
     """The label set is part of the consumer contract; the doc and the data must agree."""

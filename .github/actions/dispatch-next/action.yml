@@ -1,0 +1,63 @@
+name: Dispatch the next wave
+description: The cascade's one move — mint the dispatch App token and run dispatch-next.py, which adds the front-door label to the next wave. A no-op unless the caller enables it.
+
+# ⚠️ THE CASCADE IS ONE OF TWO DECLARED DRIVERS, NOT THE DEFAULT. A consumer that names a bot in
+# `allowed_bots` has chosen the App cascade to advance its stories; one that leaves it empty has
+# chosen a human or a driving session (see claude-team's CLAUDE.md, "How a story moves"). This
+# action is the cascade half, isolated here so the workflow's core reads as event → route → run →
+# check, with the cascade a single `uses:` the caller opts into. `dispatch-next.py` itself gates on
+# an empty `allowed_bots` and stays a quiet notice, so an enabled call in a dark repo is safe.
+#
+# ⚠️ It was three copy-pasted step-pairs in delegate, architect and authors. The mint's
+# `continue-on-error` is load-bearing and moved with it: a mint that FAILS (App authenticated but
+# not installed on the repo — the #1094 404) must still let `dispatch-next.py` run, because the
+# hook is what turns that failure into a diagnosable error instead of a silently skipped step.
+#
+# ⚠️ `dispatch-next.py` is expected at `$RUNNER_TEMP/agent-bin/`, staged by the calling job before
+# this runs — the same place every hook step in that job finds it.
+
+inputs:
+  enabled:
+    description: '"true" to run; any other value is a no-op. The caller owns the gate — first wave vs next task is its condition to compute, not this action''s.'
+    required: true
+  story:
+    description: The story whose next wave to dispatch. Blank is tolerated; the hook resolves what it can.
+    required: false
+    default: ''
+  repo:
+    description: owner/name of the repository.
+    required: true
+  allowed_bots:
+    description: The consumer's `allowed_bots` input, verbatim. Empty means dark — the hook exits with a notice and adds no label.
+    required: false
+    default: ''
+  app-id:
+    description: The dispatch App id (secret), or empty.
+    required: false
+    default: ''
+  private-key:
+    description: The dispatch App private key (secret), or empty.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Mint the dispatch token
+      id: mint
+      if: inputs.enabled == 'true'
+      continue-on-error: true
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.private-key }}
+    - name: Dispatch
+      if: inputs.enabled == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ steps.mint.outputs.token }}
+        REPO: ${{ inputs.repo }}
+        STORY: ${{ inputs.story }}
+        HAVE_SECRETS: ${{ inputs.app-id != '' && inputs.private-key != '' }}
+        ALLOWED_BOTS: ${{ inputs.allowed_bots }}
+      run: "$RUNNER_TEMP/agent-bin/dispatch-next.py"

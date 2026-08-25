@@ -289,6 +289,15 @@ story's PR, with every task's diff accumulated. A `push:` trigger restores it an
 
 ## How a story moves
 
+⚠️ **TWO DRIVERS ADVANCE A STORY ACROSS ITS TASKS, AND THE CONSUMER DECLARES WHICH.** A wave ends
+when a task closes; something then labels the next wave. That something is either the **App
+cascade** (`allowed_bots` names a bot — `dispatch-next.py` mints a token and adds the label) or a
+**human/session driver** (`allowed_bots: ""` — the maintainer's gesture, or a session running
+`take-on-story`, adds it). Neither is the default: the empty `allowed_bots` is as deliberate a
+choice as a named one, and `dispatch-next.py` exits quietly on it. The cascade lives in one place,
+the `dispatch-next` composite action, called at the three sites a wave can start; the rest of the
+workflow is driver-agnostic — it routes and runs one role whoever labelled the trigger.
+
 1. **Architect** shapes the story, **names** its branch on a `Branch:` line, and creates its tasks —
    each stamped with the role that should pick it up.
 2. Each **task** is triggered on its own. Its author commits on the branch the host action cut for

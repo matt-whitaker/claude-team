@@ -20,6 +20,14 @@ The upgrade procedure itself is [`ONBOARDING.md` §0](ONBOARDING.md).
 
 **Action required:** yes, to adopt the new layer — one copy step per consumer; nothing breaks
 
+- **The cascade is one composite action, not three inline copies.** `dispatch-next` (mint token +
+  run the hook) was copy-pasted into the delegate, architect and authors jobs; it is
+  `.github/actions/dispatch-next` now, called at each site. Behavior is unchanged — same steps,
+  same gates, same fail-open mint. The workflow core reads as event → route → run → check, with
+  the cascade a single opt-in `uses:`, matching the two-driver model (a consumer with
+  `allowed_bots` empty drives by session or hand; one that names a bot uses the cascade). No
+  consumer action; a pinned consumer picks it up at its next bump.
+
 - **The closed-trigger PR-opener verifies real parentage.** open-story-pr.py now checks the
   closed issue'''s actual parent matches the story its Branch line names, before opening a PR. The
   trigger is reachable by any issue author; the Branch line is attacker-controllable body text,
