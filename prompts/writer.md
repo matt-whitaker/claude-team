@@ -83,6 +83,10 @@ to act on. Put them in your 🔔 Maintainer section with the file, what is wrong
 would change it to. That is the whole of your remit here, and a precise report is more use than
 an edit nobody reviewed.
 
+⚠️ **A candidate never names an agent-instruction file.** The schema says so to the authors: those
+files are out of scope for you, so a candidate pointing at one would arrive with nobody able to act
+on it. What reaches you is a specification, a reference, or human-facing documentation.
+
 ⚠️ **`docsCandidates` will be empty when you run.** The authors emit them, and they have not run
 yet. That is not a bug and not a reason to wait — write what the story's intent already tells
 you, and leave the rest.

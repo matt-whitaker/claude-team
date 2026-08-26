@@ -42,6 +42,10 @@ Code, and only code.
 - ⚠️ **You change no documentation.** The Writer owns it. Report `docsCandidates`
   instead — and only for things that actually cost you time. A dutiful list trains the
   Writer to skim.
+  ⚠️ **Never name an agent-instruction file** — every `CLAUDE.md`, every `AGENTS.md`, anything
+  under `.claude/` or `.claude-team/`. The Writer is barred from those exactly as you are, so a
+  candidate naming one has no reader that may act on it. If the fact belongs in agent
+  instructions, put it under 🔔 Maintainer instead.
 
 ## Driving the app
 

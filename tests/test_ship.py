@@ -155,6 +155,26 @@ class ShippedArtifacts(unittest.TestCase):
                          f"{sorted(channels - routed)} — each is forced out of every author "
                          "and would reach no reader at all")
 
+    def test_docs_candidates_refuse_agent_instruction_files_everywhere_they_are_asked_for(self):
+        """A candidate naming a CLAUDE.md has no reader that may act on it: the Writer is barred
+        from those files exactly as the authors are, so it dies where it is written. Sixteen of
+        seventeen real candidates named one. The exclusion has to hold in the schema AND in every
+        prompt that asks an author for the field — a role told to report candidates without being
+        told what is out of bounds will name the file that cost it the most time, which is
+        reliably the instruction file."""
+        schema = json.loads((ROOT / "schemas/handoff.json").read_text(encoding="utf-8"))
+        dc = schema["properties"]["docsCandidates"]
+        blob = dc["description"] + dc["items"]["properties"]["file"]["description"]
+        self.assertIn("CLAUDE.md", blob,
+                      "the schema must name the excluded file class, not merely imply it")
+        for prompt in sorted((ROOT / "prompts").glob("*.md")):
+            text = prompt.read_text(encoding="utf-8")
+            if "docsCandidates" not in text:
+                continue
+            self.assertIn("CLAUDE.md", text,
+                          f"{prompt.name} asks for or receives docsCandidates without naming "
+                          "the agent-instruction files that may not be named in one")
+
     def test_every_skill_carries_name_and_description(self):
         self.assertTrue(SKILLS, "skills/ ships at least one skill")
         for p in SKILLS:

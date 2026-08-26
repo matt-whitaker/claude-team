@@ -69,10 +69,11 @@ Parse the JSON block in each handoff comment and carry it to the endgame:
 | `docsCandidates` | accumulate, and discharge at the endgame |
 | `decisions` | a hook appends them to a running log on the story, so the record keeps itself. Its `supersedes` field does not: carry each one to the endgame and report what now reads the old way |
 
-⚠️ **`docsCandidates` name files NO ROLE MAY WRITE, and that is why this is yours.** Sixteen of
-seventeen named a `CLAUDE.md` — agent instructions, out of scope for every role including the
-Writer. Re-triggering the Writer on them produces a run that is barred from every file in the
-list. A session is the only actor permitted to write them.
+⚠️ **A candidate names a document, never an agent-instruction file** — the schema refuses those,
+because the Writer is barred from them exactly as the authors are. What reaches you is a
+specification or a reference that a late discovery left saying the wrong thing: small, concrete,
+and worth applying. A fact belonging in agent instructions arrives under 🔔 Maintainer instead,
+and that is the maintainer's to act on.
 
 ⚠️ **An empty array is an answer and needs nothing.** The author considered it and found nothing;
 that is not a gap to chase.
@@ -92,11 +93,11 @@ silence. Post the final state on the story and hand the maintainer the PR link.
 Then discharge what you harvested:
 
 - **`docsCandidates` → a follow-up PR, after the story's PR has landed.** One PR per story,
-  applying the accepted notes to the files they name. ⚠️ **Never onto the story's own branch**: an
-  instruction file changed inside a PR being reviewed for something else is the case the team
-  forbids to every role, and the reason holds for you. ⚠️ **Not while you are still driving
-  either** — a candidate is a proposal, so weigh it and say which you dropped and why. Rejecting
-  all of them is a correct outcome.
+  applying the notes you accept to the files they name. ⚠️ **Never onto the story's own branch**:
+  the last candidate arrives from the last task, by which point that PR is open or merged, and a
+  documentation fix reviewed on its own is worth more than one appended to a diff about something
+  else. ⚠️ **A candidate is a proposal.** Weigh each, apply what earns its place, and say which you
+  dropped and why — rejecting all of them is a correct outcome.
 - **`supersedes` → report, do not edit.** Each one names something that now reads the old way — an
   issue's acceptance criteria, a spec id, a sibling task. Editing an issue body is not pre-authorized;
   list them on the story with what each points at and let the maintainer act.
