@@ -18,7 +18,9 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** yes to adopt — re-copy `.claude/rules/` and `.claude/skills/`.
+**Action required:** yes — re-copy `.claude/hooks/guard-push.py` (a security fix), `.claude/rules/` and `.claude/skills/`.
+
+- **`guard-push.py` was defeated by one ordinary quote, and is now shell-aware (brewdocs.beer-kb#50).** The guard tokenized with `str.split()`, which does not strip shell quoting the way bash does — so `git push origin "mainline"` executed identically to the bare form while the guard saw a token that was not in its set and stood down. Every one of the three protections fell to it: the push target, the `--force` flag, the `push` verb itself, and the `merge` subcommand. The same root cause ran the other way — the merge check fired on the three trigger words appearing *anywhere* in a line, so filing a report that quoted the command was blocked as if it were running it. Now `shlex.split()` per segment, the command located past prefixes and global flags (`git -C x push`, `gh -R o/r pr merge`), and the subcommand pair matched by adjacency rather than co-presence. ⚠️ **Every repo with the guard installed carries the bypassable copy until it is re-copied** — a pin bump does not reach it.
 
 - **A driving session strands a wave when it is interrupted, and now says so.** The heartbeat was written for a driver that dies; its commonest catch is a driver that is merely distracted — a task closes, something pulls the session away before it labels the next wave, and nothing wakes it again because a session-driven repo has no cascade to cover for it. `take-on-story` and the session rule (revision 14) now require sweeping **every** story held before going idle and after every interruption, not only the one last touched. Measured driving five workstreams at once: a story sat finished-but-unadvanced until the maintainer noticed.
 
