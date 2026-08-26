@@ -61,6 +61,43 @@ class GuardPush(unittest.TestCase):
         self.assert_allowed("gh pr view 42")
         self.assert_allowed("ls -la")
 
+    def test_quoting_a_token_does_not_bypass_any_protection(self):
+        """bash strips quotes before git ever sees the argument, so a quoted token executes
+        identically — a tokenizer that is not shell-aware sees a different word and stands down.
+        Every protection is asserted against both quote styles, in every position it matches on."""
+        for q in ('"', "'"):
+            self.assert_blocked(f"git push origin {q}mainline{q}", "the target was merely quoted")
+            self.assert_blocked(f"git {q}push{q} origin mainline", "the verb was merely quoted")
+            self.assert_blocked(f"git push origin HEAD:{q}mainline{q}", "the refspec target")
+            self.assert_blocked(f"git push {q}--force{q} origin feature-x", "the flag")
+            self.assert_blocked(f"gh pr {q}merge{q} 42", "the subcommand")
+            self.assert_blocked(f"{q}gh{q} pr merge 42", "the program name")
+            self.assert_blocked(f"{q}git{q} push origin mainline", "the program name")
+
+    def test_the_command_is_found_past_prefixes_and_global_flags(self):
+        """`git -C x push` and `gh -R o/r pr merge` are ordinary invocations, and a check that
+        reads only the first two tokens or demands strict adjacency misses both."""
+        self.assert_blocked("git -C /some/repo push origin mainline")
+        self.assert_blocked("git -c user.name=x push --force origin feature-x")
+        self.assert_blocked("gh -R matt-whitaker/claude-team pr merge 42")
+        self.assert_blocked("env FOO=1 git push origin mainline")
+
+    def test_the_trigger_words_do_not_fire_from_inside_an_argument(self):
+        """The mirror-image failure: co-presence anywhere in the line is not an invocation. A
+        report *about* the guard must be fileable, and describing a command is not running one."""
+        self.assert_allowed(
+            'gh issue create --title "guard bug" '
+            '--body "reproduce with: gh pr merge 42, and git push origin mainline"',
+            "an issue body quoting the commands it describes is not those commands")
+        self.assert_allowed('git commit -m "explain why gh pr merge is blocked"')
+        self.assert_allowed('echo "git push origin mainline"')
+        self.assert_allowed("gh pr list --search 'merge'")
+
+    def test_unbalanced_quotes_never_relax_a_check(self):
+        """An unparseable line is not a licence. bash would reject it too, but the guard must
+        not answer a tokenizer failure by standing down."""
+        self.assert_blocked('git push origin "mainline', "an unclosed quote is not an escape")
+
     def test_compound_commands_are_examined_per_segment(self):
         self.assert_blocked("git add -A && git commit -m x && git push origin mainline")
 
@@ -86,10 +123,14 @@ class ShippedArtifacts(unittest.TestCase):
                             f"fragment references {name}, which templates/settings/hooks does "
                             "not ship — a wired-but-absent hook fails every Bash call")
 
-    def test_guard_compiles_alone(self):
-        r = subprocess.run([sys.executable, "-m", "py_compile", str(GUARD)],
+    def test_guard_runs_alone(self):
+        """Compiling is not running. `py_compile` accepts an annotation the interpreter then
+        raises on (`int | None` before 3.10), and a guard that dies on import exits non-2 —
+        which the harness reads as permission. The check has to execute it."""
+        r = subprocess.run([sys.executable, str(GUARD)], input='{"tool_input":{"command":"ls"}}',
                            capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "", "a clean run says nothing")
 
     def test_every_skill_carries_name_and_description(self):
         self.assertTrue(SKILLS, "skills/ ships at least one skill")
