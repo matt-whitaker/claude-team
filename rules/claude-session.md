@@ -1,6 +1,6 @@
 # claude-session
 
-**session-rule-revision: 13** · from `matt-whitaker/claude-team`
+**session-rule-revision: 14** · from `matt-whitaker/claude-team`
 
 ⚠️ **This file is entirely claude-team's — the session half.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -156,11 +156,16 @@ what the backlog does; this section is only how the session conducts itself whil
 - **The endgame is verified, not assumed.** After the last task closes, confirm the story's PR
   exists and says what landed; a missing PR is a diagnosis to run, never a silence to leave.
 - ⚠️ **A parked watcher is not a plan; arm a heartbeat beside it.** A watcher dies with its
-  session, and a dead driver halts a story silently. On taking a story, also arm a scheduled
+  session, and a dead driver halts a story silently — but the commoner case is a *living* driver
+  that got interrupted between a wave finishing and the next one being labelled. Both look
+  identical from outside: a story that stopped and said nothing. On taking a story, also arm a scheduled
   re-check on a long interval (the watcher is the wake path; the heartbeat is the net). Each
   heartbeat tick is the same move as any wake: reconcile the story from GitHub, advance what
   moved, re-park what died. Driving several stories is one tick sweeping all of them, not one
   heartbeat each.
+- ⚠️ **Sweep every story you hold before going idle, and after every interruption.** Not the one you
+  were last touching — all of them. A task that closed while your attention was elsewhere leaves a
+  wave nobody will label, and nothing will wake you about it.
 - **Resume is the heartbeat's move from zero.** A fresh session handed a mid-flight story reads
   the posted state and continues; nothing about the previous driver's death needs diagnosing
   first. What makes this work is the posting discipline above — protect it before optimizing
