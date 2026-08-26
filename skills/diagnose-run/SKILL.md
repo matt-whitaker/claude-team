@@ -8,6 +8,10 @@ The tracking comment looks identical in success and death, and `gh run list --li
 hands you the wrong run. Resolve the run from the task (`gh run list` matched on the task ref),
 then read **jobs → failing step → that step's log**.
 
+⚠️ **Read runs over REST**: `gh api repos/{o}/{r}/actions/runs/{id}` and `.../runs?per_page=N` bill
+the `core` pool, while `gh run view --json` bills **GraphQL** — the pool a driving session drains
+first, and the one that stops a drive when it empties (#93).
+
 ## The fingerprints
 
 Match before theorizing — each of these was measured, and each points at a different fix:
