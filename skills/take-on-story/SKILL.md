@@ -46,12 +46,36 @@ consuming repo, don't assume. Post one comment on the story: driving begins, whi
    outside. Measured driving five workstreams at once: a task closed, an interrupt arrived mid-wake,
    and the next wave was never labelled until the maintainer noticed.
 4. On wake, verify by **jobs, steps, and outcomes — never the tracking comment**:
-   - Task closed, handoff posted → post progress on the story, advance to the next wave.
+   - Task closed, handoff posted → **harvest it** (below), post progress, advance to the next wave.
    - Task open with `remaining` → the author says it isn't done. Read why; re-trigger or
      surface to the maintainer. Do not close it yourself.
    - Run failed or the task closed without a handoff → diagnose from the run's steps before
      touching anything. A setup failure has no result payload; read the failing step.
 5. Repeat until the sequencing is exhausted.
+
+### Harvesting a handoff
+
+⚠️ **READ THE HANDOFF'S CONTENTS, NOT ITS PRESENCE.** Four channels are forced out of every author;
+two reach an automated reader on their own and two reach nobody unless you carry them. A story can
+run green to completion with both accumulating on its issue and nothing consuming either. Measured
+across twelve closed stories: seventeen `docsCandidates` and fourteen `supersedes`, none actioned.
+
+Parse the JSON block in each handoff comment and carry it to the endgame:
+
+| channel | what you do with it |
+|---|---|
+| `remaining` | already handled in step 4 — the task is not finished |
+| `testingNotes` | nothing; the Tester reads it on its own trigger |
+| `docsCandidates` | accumulate, and discharge at the endgame |
+| `decisions` | a hook appends them to a running log on the story, so the record keeps itself. Its `supersedes` field does not: carry each one to the endgame and report what now reads the old way |
+
+⚠️ **`docsCandidates` name files NO ROLE MAY WRITE, and that is why this is yours.** Sixteen of
+seventeen named a `CLAUDE.md` — agent instructions, out of scope for every role including the
+Writer. Re-triggering the Writer on them produces a run that is barred from every file in the
+list. A session is the only actor permitted to write them.
+
+⚠️ **An empty array is an answer and needs nothing.** The author considered it and found nothing;
+that is not a gap to chase.
 
 ⚠️ **Sweep before you rest, and after every interruption.** Whenever you are about to go idle — and
 whenever anything pulls you off the loop — reconcile **every** story you hold, not just the one you
@@ -64,6 +88,23 @@ idle without that sweep is how a story stops silently.
 After the last task closes, confirm the story's PR exists, targets the right branch, and its body
 reflects what landed. A missing PR is a diagnosis (the team documents the usual causes), never a
 silence. Post the final state on the story and hand the maintainer the PR link.
+
+Then discharge what you harvested:
+
+- **`docsCandidates` → a follow-up PR, after the story's PR has landed.** One PR per story,
+  applying the accepted notes to the files they name. ⚠️ **Never onto the story's own branch**: an
+  instruction file changed inside a PR being reviewed for something else is the case the team
+  forbids to every role, and the reason holds for you. ⚠️ **Not while you are still driving
+  either** — a candidate is a proposal, so weigh it and say which you dropped and why. Rejecting
+  all of them is a correct outcome.
+- **`supersedes` → report, do not edit.** Each one names something that now reads the old way — an
+  issue's acceptance criteria, a spec id, a sibling task. Editing an issue body is not pre-authorized;
+  list them on the story with what each points at and let the maintainer act.
+- **🔔 Maintainer and ❓Blocked sections → surface them.** A question whose only reader was the
+  run's own transcript has no reader at all.
+
+⚠️ **Where a finding pokes at the scope of the subject matter, ask rather than act.** The licence
+here is to discharge what the authors already decided, not to widen the story.
 
 ## Throughout
 

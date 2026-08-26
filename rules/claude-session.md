@@ -1,6 +1,6 @@
 # claude-session
 
-**session-rule-revision: 14** · from `matt-whitaker/claude-team`
+**session-rule-revision: 15** · from `matt-whitaker/claude-team`
 
 ⚠️ **This file is entirely claude-team's — the session half.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -155,6 +155,17 @@ what the backlog does; this section is only how the session conducts itself whil
   story and continues. If the last posted state is stale, that IS the diagnostic.
 - **The endgame is verified, not assumed.** After the last task closes, confirm the story's PR
   exists and says what landed; a missing PR is a diagnosis to run, never a silence to leave.
+- ⚠️ **A handoff is read for its CONTENTS, not for whether it exists.** Its presence tells you the
+  author finished; its four channels are the deliverable. Two of them reach an automated reader on
+  their own — `remaining` and `testingNotes` — and two reach nobody unless the driver carries them.
+  ⚠️ **`docsCandidates` name agent-instruction files, which no role may write**, so the session is
+  not a fallback reader but the only permitted one. Discharge them in a follow-up PR **after** the
+  story's PR lands, never on the story's branch and never mid-drive: an instruction file changed
+  inside a PR being reviewed for something else is the case the team forbids to every role, and a
+  driver does not edit law it is running under. `supersedes` is reported, never applied by hand —
+  it names an issue's criteria or a spec that now reads the old way, and editing those is the
+  maintainer's. ⚠️ **Where a finding pokes at the scope of the subject matter, ask rather than
+  act**: the licence is to discharge what the authors decided, not to widen the story.
 - ⚠️ **A parked watcher is not a plan; arm a heartbeat beside it.** A watcher dies with its
   session, and a dead driver halts a story silently — but the commoner case is a *living* driver
   that got interrupted between a wave finishing and the next one being labelled. Both look
