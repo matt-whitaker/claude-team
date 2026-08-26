@@ -18,7 +18,9 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** yes to adopt — re-copy `.claude/skills/`.
+**Action required:** yes to adopt — re-copy `.claude/rules/` and `.claude/skills/`.
+
+- **A driving session strands a wave when it is interrupted, and now says so.** The heartbeat was written for a driver that dies; its commonest catch is a driver that is merely distracted — a task closes, something pulls the session away before it labels the next wave, and nothing wakes it again because a session-driven repo has no cascade to cover for it. `take-on-story` and the session rule (revision 14) now require sweeping **every** story held before going idle and after every interruption, not only the one last touched. Measured driving five workstreams at once: a story sat finished-but-unadvanced until the maintainer noticed.
 
 - **A `file-a-finding` skill.** Filing a bug, a security finding, a wrong rule or an out-of-scope defect so a fixer can act without re-doing the investigation: which kind it is, which repo owns it, and what the body must carry — reproduction, measurement, the ceiling, and what could not be determined. The Architect may not rewrite a bug's body, so the report is the deliverable and a thin one is rejected rather than repaired.
 - **`take-on-story` and `diagnose-run` reconcile more cheaply (#93).** One batched query per transition, REST for issue and run status, immutable state read once, and the rate pools sampled per story. Driving three stories concurrently exhausted the GraphQL pool twice in an hour while core sat near a quarter used; the pools are independent and only the driver's polling spends them.

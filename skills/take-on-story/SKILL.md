@@ -38,6 +38,13 @@ consuming repo, don't assume. Post one comment on the story: driving begins, whi
    (20–30 min). A tick that finds everything in flight is a silent no-op; a tick that finds a
    dead watcher re-parks it; a tick after your own death is the resume. One heartbeat sweeps
    every story you are driving.
+   ⚠️ **ITS COMMONEST CATCH IS NOT A DEAD WATCHER — IT IS A WAVE THE DRIVER FORGOT TO ADVANCE.**
+   A watcher wakes you once, for one run. Anything that pulls you away between that wake and the
+   next label — a question, a second story, a diagnosis — leaves the story finished-but-unadvanced,
+   and nothing wakes you again: the repo is session-driven, so no cascade will do it for you. A
+   living driver strands a story exactly as effectively as a dead one, and it looks identical from
+   outside. Measured driving five workstreams at once: a task closed, an interrupt arrived mid-wake,
+   and the next wave was never labelled until the maintainer noticed.
 4. On wake, verify by **jobs, steps, and outcomes — never the tracking comment**:
    - Task closed, handoff posted → post progress on the story, advance to the next wave.
    - Task open with `remaining` → the author says it isn't done. Read why; re-trigger or
@@ -45,6 +52,12 @@ consuming repo, don't assume. Post one comment on the story: driving begins, whi
    - Run failed or the task closed without a handoff → diagnose from the run's steps before
      touching anything. A setup failure has no result payload; read the failing step.
 5. Repeat until the sequencing is exhausted.
+
+⚠️ **Sweep before you rest, and after every interruption.** Whenever you are about to go idle — and
+whenever anything pulls you off the loop — reconcile **every** story you hold, not just the one you
+were last touching. One batched query answers it: for each story, is there a closed task whose
+successor carries no label? That is a stranded wave, and it is the driver's to label now. Going
+idle without that sweep is how a story stops silently.
 
 ## 3. The endgame
 
@@ -61,5 +74,8 @@ silence. Post the final state on the story and hand the maintainer the PR link.
   rather than a feeling — and so hitting a limit is caught before it stops a drive.
 - Labels and progress comments on this story are pre-authorized; merging, closing issues, editing
   bodies, and anything on other stories is not.
+- ⚠️ **An interrupt does not pause the stories.** Answering a question, diagnosing another repo, or
+  taking new work does not suspend anything you are driving — runs keep finishing and waves keep
+  coming due. Sweep when you return.
 - If the same task fails the same way twice, stop driving and report — a driver that keeps
   re-triggering is suppressing the signal.
