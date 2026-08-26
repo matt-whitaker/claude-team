@@ -686,7 +686,8 @@ class HarnessFoldedIn(unittest.TestCase):
                          "every self-reference must name claude-team now, not the retired repo")
 
     def test_the_moved_skills_point_at_the_team(self):
-        for name in ("handoff", "take-on-story", "upgrade-team", "shape-story", "diagnose-run"):
+        for name in ("handoff", "take-on-story", "upgrade-team", "shape-story", "diagnose-run",
+                     "file-a-finding"):
             self.assertTrue((ROOT / "skills" / name / "SKILL.md").exists(), name)
         self.assertNotIn("claude-harness", (ROOT / "skills/take-on-story/SKILL.md").read_text())
         self.assertNotIn("claude-harness", (ROOT / "skills/handoff/SKILL.md").read_text())

@@ -18,7 +18,10 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** no — a policy change in this repo; consumers already pin.
+**Action required:** yes to adopt — re-copy `.claude/skills/`.
+
+- **A `file-a-finding` skill.** Filing a bug, a security finding, a wrong rule or an out-of-scope defect so a fixer can act without re-doing the investigation: which kind it is, which repo owns it, and what the body must carry — reproduction, measurement, the ceiling, and what could not be determined. The Architect may not rewrite a bug's body, so the report is the deliverable and a thin one is rejected rather than repaired.
+- **`take-on-story` and `diagnose-run` reconcile more cheaply (#93).** One batched query per transition, REST for issue and run status, immutable state read once, and the rate pools sampled per story. Driving three stories concurrently exhausted the GraphQL pool twice in an hour while core sat near a quarter used; the pools are independent and only the driver's polling spends them.
 
 - **Every repo pins a release; nothing tracks `@mainline`.** The canary model is retired: brewdocs.beer, claude-team-example and this repo's own stub pinned the edge so a bad change met real work before any pinned consumer saw it. All of them pin `@vN` now, and what a repo runs is answerable from its stub alone. ⚠️ The cost, accepted: nothing exercises the edge, so the suite and a drill in claude-team-example are all that stand between a merge and a release — drill a structural change **before** tagging. `SelfInstall` now asserts this repo's stub names a `vN`.
 

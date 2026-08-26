@@ -22,6 +22,14 @@ consuming repo, don't assume. Post one comment on the story: driving begins, whi
 ## 2. The wave loop
 
 1. Reconcile: re-read the story and its tasks from GitHub. Never act on remembered state.
+   ⚠️ **One batched query per transition, and prefer REST.** `gh issue view` / `gh pr view` /
+   `gh run view --json` bill the **GraphQL** pool; `gh api repos/{o}/{r}/issues/{n}` and
+   `.../actions/runs/{id}` bill **core** — two independent budgets, and concurrency drains GraphQL
+   first. Driving three stories exhausted it twice in one hour while core sat near a quarter used
+   (#93). Ask for every task and story in one aliased GraphQL query rather than one call each; it
+   is also the only *consistent* read, since separate calls describe separate moments. Read
+   immutable state — titles, the task list, the `### Sequencing` section — once at drive start,
+   not every tick.
 2. Label the next wave's task with the front-door label (your `gh` is the maintainer's account —
    a human-actor event; no App required).
 3. Find the run it started (`gh run list`, newest, matched to the task) and park
@@ -48,6 +56,9 @@ silence. Post the final state on the story and hand the maintainer the PR link.
 
 - State posted at every transition, on the story issue. A fresh session must be able to resume
   from GitHub alone.
+- **Sample the pools per story**: `gh api rate_limit` costs one core call and reports `used` for
+  each. Record the delta with the wave state you already post, so a wasteful driver is a number
+  rather than a feeling — and so hitting a limit is caught before it stops a drive.
 - Labels and progress comments on this story are pre-authorized; merging, closing issues, editing
   bodies, and anything on other stories is not.
 - If the same task fails the same way twice, stop driving and report — a driver that keeps
