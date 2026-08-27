@@ -18,7 +18,11 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** yes — **v4.1 and v4.2 break every authoring run** (see below); upgrade past them and re-copy `.claude/rules/` and `.claude/skills/`.
+**Action required:** n/a — nothing has landed since `v4.3`.
+
+## v4.3
+
+**Action required:** yes — re-copy `.claude/rules/`, `.claude/skills/` and `.claude/hooks/guard-push.py`. ⚠️ **Upgrade to this straight from `v4`. Do not adopt `v4.1` or `v4.2`**: both ship a `handoff.json` carrying an apostrophe, which the workflow refuses to inline, so the authors job dies before the model runs.
 
 - **`handoff.json` carried an apostrophe, and v4.1 and v4.2 both shipped it.** Every schema is inlined into `claude_args` inside single quotes, and the workflow `exit 1`s the step rather than emit a value that would mangle every flag after it — so the authors job dies **before the model runs**. Nothing broke in the fleet only because every repo was still pinned to `v4`; upgrading would have broken all of them at once. A test now compacts every schema in `schemas/` and asserts it is one quote-free line, and asserts the workflow guards each schema it inlines. ⚠️ **Do not adopt v4.1 or v4.2.**
 - **A role now names the issues it filed, and a hook attributes them.** An issue cannot say who filed it — every role writes through the same App account — and timing cannot recover it: bracketing identifies the filer only while one role run is live, and driving concurrent stories makes several the ordinary case. Measured on brewdocs.beer#1373, whose creation fell inside two live runs at once. The handoff schema gains a required **`filed`** channel, the Security role gains a forced schema of its own (`schemas/security.json`, `filed` + `clean`), and `stamp-filed.py` comments the attribution onto each issue named. Deterministic at both ends: the schema forces the run to name what it filed, the hook forces the attribution to land.
