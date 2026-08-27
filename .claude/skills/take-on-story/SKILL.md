@@ -53,6 +53,50 @@ consuming repo, don't assume. Post one comment on the story: driving begins, whi
      touching anything. A setup failure has no result payload; read the failing step.
 5. Repeat until the sequencing is exhausted.
 
+### Adopting what a role filed
+
+⚠️ **A ROLE FILES ISSUES WHILE IT WORKS, AND THE ISSUE CANNOT SAY WHO FILED IT.** A finding out of
+scope is filed rather than swept into the change, and Security files on every merge. All of them
+are authored by the same App account, so nothing on the issue names the role or the work it came
+out of, and nothing downstream claims it.
+
+**The run says so itself.** Every role reports `filed` — the issue numbers it created — through
+its forced schema, and a hook comments the attribution onto each one. So the ordinary path is to
+*read* the attribution, not to deduce it.
+
+Do this at the wake that closes each task; an unplaced issue is at its most traceable in the
+minutes after it appears.
+
+1. **Read `filed` from the handoff.** Those numbers are the run's own account of what it brought
+   into existence — first-party and certain. `[]` is the common answer and a real one.
+2. **Check each one is placed.** The hook writes the attribution; you supply the **kind label** —
+   `bug`, or `spike` for a question with no reproduction. ⚠️ **Never the front-door label**:
+   placing an issue is not starting it, and starting it is the maintainer's gesture. ⚠️ An issue
+   carrying no kind reads as a **story**, so an unlabelled bug is decomposed into tasks instead of
+   being fixed.
+3. **Report every one at the endgame**, with the story.
+
+#### The backstop, for what `filed` missed
+
+⚠️ **Do not make this the primary path.** It is here because a run can die before its hook runs,
+and because a role can under-report. Sweep for bot-authored issues created since the drive began
+that no handoff claimed:
+
+```bash
+gh api "repos/{o}/{r}/issues?state=all&since=<drive-start>&per_page=50" \
+  -q '.[] | select(.user.type=="Bot") | select(.pull_request==null) | .number'
+```
+
+⚠️ **Your Architect's tasks are in that list and are not findings.** The discriminator is
+**sub-issue membership**: a task is a child of its story, a filed finding is a child of nothing.
+You already hold the task list, so this costs no call.
+
+⚠️ **Attribute only as far as the evidence goes.** An unclaimed issue can be bracketed against the
+run windows you parked, and that is weaker than a declaration: **one** live role run identifies the
+filer, **several** do not — and driving concurrent stories makes several the ordinary case, not the
+edge. Name the candidates, say which the content points to, and mark that half as inferred. A guess
+presented as a fact is worse than an open question.
+
 ### Harvesting a handoff
 
 ⚠️ **READ THE HANDOFF'S CONTENTS, NOT ITS PRESENCE.** Four channels are forced out of every author;
@@ -67,6 +111,7 @@ Parse the JSON block in each handoff comment and carry it to the endgame:
 | `remaining` | already handled in step 4 — the task is not finished |
 | `testingNotes` | nothing; the Tester reads it on its own trigger |
 | `docsCandidates` | accumulate, and discharge at the endgame |
+| `filed` | the issues this run created — adopt each one (above): label its kind, check the hook's attribution landed, report it at the endgame |
 | `decisions` | a hook appends them to a running log on the story, so the record keeps itself. Its `supersedes` field does not: carry each one to the endgame and report what now reads the old way |
 
 ⚠️ **A candidate names a document, never an agent-instruction file** — the schema refuses those,
@@ -103,6 +148,8 @@ Then discharge what you harvested:
   list them on the story with what each points at and let the maintainer act.
 - **🔔 Maintainer and ❓Blocked sections → surface them.** A question whose only reader was the
   run's own transcript has no reader at all.
+- **Issues the roles filed → list them**, each with its kind, what filed it, and one line on what
+  it is. They are the part of a story's output that leaves no trace in its PR.
 
 ⚠️ **Where a finding pokes at the scope of the subject matter, ask rather than act.** The licence
 here is to discharge what the authors already decided, not to widen the story.
