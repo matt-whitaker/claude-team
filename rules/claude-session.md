@@ -1,6 +1,6 @@
 # claude-session
 
-**session-rule-revision: 15** · from `matt-whitaker/claude-team`
+**session-rule-revision: 16** · from `matt-whitaker/claude-team`
 
 ⚠️ **This file is entirely claude-team's — the session half.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -155,6 +155,17 @@ what the backlog does; this section is only how the session conducts itself whil
   story and continues. If the last posted state is stale, that IS the diagnostic.
 - **The endgame is verified, not assumed.** After the last task closes, confirm the story's PR
   exists and says what landed; a missing PR is a diagnosis to run, never a silence to leave.
+- ⚠️ **AN ISSUE A ROLE FILED IS THE DRIVER'S TO PLACE.** Roles file findings as they work — a
+  defect out of scope, a security review on merge — and every one arrives authored by the App, so
+  the issue carries no trace of which role wrote it or what it came out of. Nothing downstream
+  claims it. While driving, adopt each one at the wake that closes the task: label its kind
+  (`bug`, or `spike` for a question), and comment the attribution — the role, the task and story,
+  the run. ⚠️ **The kind label is not optional and not cosmetic**: an issue with no kind reads as
+  a story, so an unlabelled bug is decomposed into tasks instead of being fixed. ⚠️ **Never the
+  front-door label** — placing an issue is not starting it. ⚠️ **Attribute only as far as the
+  evidence goes.** Timing identifies the filing run when one role run was live; with several in
+  flight it does not, and saying which anyway is a guess wearing a fact's clothes. Name the
+  candidates and mark the inference.
 - ⚠️ **A handoff is read for its CONTENTS, not for whether it exists.** Its presence tells you the
   author finished; its four channels are the deliverable. Two of them reach an automated reader on
   their own — `remaining` and `testingNotes` — and two reach nobody unless the driver carries them.
