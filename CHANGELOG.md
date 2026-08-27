@@ -18,7 +18,9 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** n/a — nothing has landed since `v4.2`.
+**Action required:** yes to adopt — re-copy `.claude/rules/` and `.claude/skills/`.
+
+- **A driving session adopts the issues its roles file.** A role files a finding rather than sweeping it into the change, and the Security role files on every merge — but each arrives authored by the App, the same author for every role, so **the issue says nothing about who wrote it or what it came out of** and nothing downstream claims it. The driver now adopts each one at the wake that closes the task: it separates findings from its Architect's tasks by sub-issue membership, labels the kind, and comments the attribution — role, task, story, run. ⚠️ The kind label is load-bearing: `team.kind()` reads an unlabelled issue as a **story**, so a bug with no label is decomposed into tasks instead of fixed. Measured on the two known cases: **both arrived with no kind label** — brewdocs.beer#1373 sat 23 hours before the maintainer labelled it by hand, and claude-team#98, a critical guard bypass, was filed unlabelled by the Security role. ⚠️ Attribution is bounded by what timing can show — one live role run identifies the filer, several do not, and the driver names candidates rather than guessing. Session rule revision 16.
 
 ## v4.2
 
