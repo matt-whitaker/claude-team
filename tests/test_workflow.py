@@ -1,4 +1,5 @@
 import os
+import json
 import pathlib
 import re
 import unittest
@@ -633,6 +634,71 @@ class ReleasePins(unittest.TestCase):
         rule_ref = re.search(r"\*\*team-ref: (\S+)\*\*", RULE).group(1)
         self.assertEqual(rule_ref, team_ref,
                          "rules/claude-team.md's team-ref must flip with every other pin")
+
+
+class EveryJobStagesWhatItReaches(unittest.TestCase):
+    """⚠️ `$RUNNER_TEMP/agent-bin/` and `$RUNNER_TEMP/team-src/` exist because a step put them
+    there. A job reaching into either without the staging step fails as a MISSING FILE — no
+    error naming the real cause, and on `always()` steps it fails after the model has already
+    run and spent its budget.
+
+    ⚠️ The security job had no staging step for most of its life, correctly: nothing in it read
+    the team source or ran a hook. Giving it a schema and an attribution hook made it need one,
+    and nothing but this would have said so."""
+
+    def test_a_job_that_reaches_for_staged_files_stages_them(self):
+        jobs = re.split(r"\n  (?=[a-z_]+:\n)", TEAM)
+        checked = 0
+        for job in jobs:
+            head = job.strip().splitlines()[0] if job.strip() else ""
+            name = head.split(":", 1)[0].strip()
+            if not name or " " in name:
+                continue
+            if "agent-bin/" not in job and "team-src/" not in job:
+                continue
+            checked += 1
+            with self.subTest(job=name):
+                self.assertIn("Stash the agent hooks", job,
+                              f"job {name!r} reads a staged path but never stages it — the step "
+                              "fails as a missing file, naming nothing")
+        self.assertGreater(checked, 1, "the split found no jobs; the pattern has drifted")
+
+
+class SchemasAreInlineSafe(unittest.TestCase):
+    """⚠️ EVERY SCHEMA IS INLINED INTO `claude_args` INSIDE SINGLE QUOTES, and `claude_args` is a
+    literal block scalar parsed line by line. A schema carrying an apostrophe, or spanning two
+    lines once compacted, mangles every flag after it — so the workflow checks and `exit 1`s the
+    step. That kills the job **before the model runs**, which is the whole authoring half of a
+    run.
+
+    ⚠️ Nothing checked this until v4.1 and v4.2 had both shipped a `handoff.json` containing the
+    word "report's". Every repo was still pinned to v4, so nothing broke — the upgrade would have
+    been what broke it, in every consumer at once. Prose is edited far more often than the
+    workflow that carries it, which is why the check belongs here and not only there."""
+
+    SCHEMAS = sorted((ROOT / "schemas").glob("*.json"))
+
+    def test_every_schema_compacts_to_one_quote_free_line(self):
+        self.assertTrue(self.SCHEMAS, "schemas/ ships at least one schema")
+        for path in self.SCHEMAS:
+            with self.subTest(schema=path.name):
+                compact = json.dumps(json.loads(path.read_text(encoding="utf-8")),
+                                     separators=(",", ":"))
+                self.assertNotIn("'", compact,
+                                 f"{path.name} carries an apostrophe — the workflow exits 1 on "
+                                 "this and the job dies before the model runs. Rephrase to avoid "
+                                 "the possessive.")
+                self.assertNotIn("\n", compact, f"{path.name} does not compact to one line")
+
+    def test_the_workflow_guards_every_schema_it_inlines(self):
+        """The test above and the workflow's own check are the same rule stated twice. A schema
+        inlined with no guard beside it would fail this way with no error naming the cause."""
+        for path in self.SCHEMAS:
+            if f"schemas/{path.name}" not in TEAM:
+                continue
+            with self.subTest(schema=path.name):
+                self.assertIn(f"::error::{path.name} contains a single quote", TEAM,
+                              f"{path.name} is inlined but carries no single-quote guard")
 
 
 class SecurityFilesLabelled(unittest.TestCase):

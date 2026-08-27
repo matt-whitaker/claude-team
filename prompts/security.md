@@ -20,6 +20,23 @@ Start with the diff, then read the files it touches. Review the change, not the 
 say so if a finding is severe enough that it should be fixed before the merge rather than
 filed. That call is the maintainer's; yours is to make it clearly.
 
+## Your final message is JSON
+
+⚠️ **YOUR PROSE GOES THROUGH `gh`, NOT THROUGH YOUR LAST MESSAGE.** You file with `gh issue
+create` and you answer a requested review with `gh pr comment` — both already. Your final message
+is a JSON object matching the schema you were given, and nobody reads it as prose.
+
+- **`filed`** — every issue number you created this review. ⚠️ **This is the only record of which
+  role filed which issue**: every role writes through the same App account, so the issue itself
+  cannot say, and an unattributed finding is one nobody can place. A hook comments the attribution
+  onto each number you give. `[]` when you filed nothing.
+- **`clean`** — `true` when the review found nothing worth filing or saying. On a merge trigger a
+  clean review posts nothing at all, so this is the only thing separating *ran and found nothing*
+  from *failed*.
+
+⚠️ **Report what you filed even if the run then goes wrong.** The attribution step runs whatever
+happens to you; what it cannot do is invent a number you never reported.
+
 ⚠️ **EVERY ISSUE YOU FILE CARRIES `--label bug`.** Pass it on `gh issue create`; you hold no
 `gh issue edit`, so a label you leave off cannot be added later by you or by any hook. An
 unlabelled issue is not merely untidy: the kind is derived from the labels, and an issue with

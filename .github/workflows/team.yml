@@ -1819,6 +1819,20 @@ jobs:
             tester=${{ steps.tester.outcome }}
             writer=${{ steps.writer.outcome }}
         run: "$RUNNER_TEMP/agent-bin/post-handoff.py"
+      # ⚠️ AN ISSUE CANNOT SAY WHICH ROLE FILED IT — every role writes through the same App
+      # account, and the issue carries no link back to the run. Timing cannot recover it either:
+      # bracketing works only while one role run is live, and concurrent stories make several the
+      # ordinary case. The `filed` channel is the run naming its own output; this lands it.
+      - name: Attribute the issues this run filed
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ !github.event.issue.pull_request && github.event.issue.number || '' }}
+          STORY: ${{ needs.delegate.outputs.story }}
+          ROLES: ${{ steps.roles.outputs.list }}
+          REPORT: ${{ steps.implementor.outputs.structured_output || steps.designer.outputs.structured_output || steps.tester.outputs.structured_output || steps.writer.outputs.structured_output }}
+        run: "$RUNNER_TEMP/agent-bin/stamp-filed.py"
       - name: Update the story's task order
         if: always()
         env:
@@ -1906,10 +1920,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # ⚠️ THIS JOB HAD NO STAGING STEP, because until now nothing in it read the team source or
+      # ran a hook — the role wrote its findings itself with `gh`. The schema below and the
+      # attribution hook after the model step both need it, and both would fail as a missing file
+      # rather than as a missing step.
+      - name: Stash the agent hooks
+        run: |
+          if [ ! -d "$RUNNER_TEMP/team-src" ]; then
+            git clone -q --depth 1 --branch "$TEAM_REF" "https://github.com/$TEAM_REPO" "$RUNNER_TEMP/team-src"
+          fi
+          mkdir -p "$RUNNER_TEMP/agent-bin"
+          cp "$RUNNER_TEMP/team-src/hooks/"*.py "$RUNNER_TEMP/agent-bin/"
+          chmod +x "$RUNNER_TEMP/agent-bin"/*.py
       - id: prompt
         uses: matt-whitaker/claude-team/.github/actions/load-prompt@mainline
         with:
           role: security
+      # ⚠️ THE ONE THING A SECURITY ISSUE CANNOT SAY IS WHO FILED IT. Every role writes through
+      # the same App account, so the schema is what makes the run name its own output. The prose
+      # is unaffected: this role reports through `gh pr comment` and `gh issue create`, not
+      # through its final message, so forcing that message to JSON costs it nothing.
+      - id: security-schema
+        name: Load the security schema
+        run: |
+          # same constraints as every other inlined schema: one line, and no single quote,
+          # because it is inlined into a single-quoted claude_args flag
+          body=$(jq -c . "$RUNNER_TEMP/team-src/schemas/security.json")
+          case "$body" in
+            *"'"*) echo "::error::security.json contains a single quote; it cannot be inlined into claude_args"; exit 1 ;;
+          esac
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+          echo "security schema loaded (${#body} chars)"
       - id: security
         uses: anthropics/claude-code-action@v1
         env:
@@ -1964,7 +2005,18 @@ jobs:
           claude_args: |
             --model sonnet
             --allowedTools "Read,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh issue create:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh repo view:*),Bash(gh project item-add:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git status:*),Bash(git rev-parse:*),Bash(git ls-files:*),Bash(git blame:*),Bash(npm audit:*)"
+            --json-schema '${{ steps.security-schema.outputs.body }}'
             --max-turns 40
+
+      # ⚠️ Step env is per-step, so the token here is not the one the model step held.
+      - name: Attribute the issues this review filed
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ROLES: the Security review
+          REPORT: ${{ steps.security.outputs.structured_output }}
+        run: "$RUNNER_TEMP/agent-bin/stamp-filed.py"
 
       # ⚠️ Diagnostics only, and it must never redden a good run — hence continue-on-error, and
       # `always()` so a FAILED run still yields its transcript, which is when you most want one.

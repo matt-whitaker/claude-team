@@ -60,7 +60,7 @@
     },
     "docsCandidates": {
       "type": "array",
-      "description": "For the Writer. Things that cost you time to work out and would cost the next reader the same. A proposal, never an instruction - the Writer decides what earns a place. Empty when nothing cost you time. NEVER name an agent-instruction file: every CLAUDE.md, every AGENTS.md, anything under .claude/ or .claude-team/ is out of scope for the Writer as it is for you, so a candidate naming one has no reader that may act on it and dies where it is written. A fact that belongs in agent instructions goes in your report's maintainer section instead, where a human reads it. This is the commonest way a candidate is wasted.",
+      "description": "For the Writer. Things that cost you time to work out and would cost the next reader the same. A proposal, never an instruction - the Writer decides what earns a place. Empty when nothing cost you time. NEVER name an agent-instruction file: every CLAUDE.md, every AGENTS.md, anything under .claude/ or .claude-team/ is out of scope for the Writer as it is for you, so a candidate naming one has no reader that may act on it and dies where it is written. A fact that belongs in agent instructions goes in the maintainer section of your report instead, where a human reads it. This is the commonest way a candidate is wasted.",
       "items": {
         "type": "object",
         "properties": {
@@ -85,6 +85,14 @@
         "additionalProperties": false
       }
     },
+    "filed": {
+      "type": "array",
+      "description": "Issue numbers YOU created during this run - a bug you found outside the scope of this task, a question worth its own spike, anything you filed rather than swept into the change. Empty is the common answer and a real one. This is the ONLY record of which role filed an issue: the issues of every role are authored by the same App account, so the issue itself cannot say who wrote it, and a run that files without reporting here leaves an issue nobody can place. A hook comments the attribution onto each number you give. Do not list issues you merely referenced, and do not list the tasks of your own story - only what this run brought into existence.",
+      "items": {
+        "type": "integer",
+        "description": "The issue number, as an integer. A bare number: not a URL, and not prefixed with a hash."
+      }
+    },
     "commitMessage": {
       "type": "string",
       "maxLength": 400,
@@ -96,6 +104,7 @@
     "decisions",
     "testingNotes",
     "docsCandidates",
+    "filed",
     "commitMessage"
   ],
   "additionalProperties": false

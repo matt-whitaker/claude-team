@@ -80,6 +80,12 @@ goes looking for a section in a comment.
   genuinely nothing: it says "I considered this and there is nothing here", which a later
   role can act on. A missing key says nothing at all.
 
+- ⚠️ **`filed` is every issue number YOU created this run**, and it is the only record of which
+  role filed which issue: every role writes through the same App account, so the issue itself
+  cannot say. A hook comments the attribution onto each number you give. `[]` is the common
+  answer. ⚠️ **Do not list issues you merely referenced, and never your own tasks** — only what
+  this run brought into existence.
+
 ⚠️ **`remaining` is the only way to say you did not finish, and leaving the closing keyword out
 of the PR body is NOT one.** A hook puts that keyword back — it always did, because a *forgotten*
 keyword is the commoner mistake and losing the close is silent. So the omission you meant as a
