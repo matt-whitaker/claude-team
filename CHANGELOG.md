@@ -18,6 +18,10 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
+**Action required:** n/a — nothing has landed since `v4.1`.
+
+## v4.1
+
 **Action required:** yes — re-copy `.claude/hooks/guard-push.py` (a security fix), `.claude/rules/` and `.claude/skills/`.
 
 - **`docsCandidates` may no longer name an agent-instruction file, and a driving session now reads the handoff rather than just its arrival (#99).** Four channels are forced out of every author. `remaining` and `testingNotes` reach an automated reader; `docsCandidates` and `decisions[].supersedes` reached nobody unless the maintainer acted by hand. Measured across twelve closed stories: **seventeen `docsCandidates` and fourteen `supersedes`, none actioned** — one file collected five candidates and had not been touched in sixteen days. ⚠️ **Sixteen of the seventeen named a `CLAUDE.md`**, which the Writer is barred from writing exactly as the authors are, so those candidates had no reader that could act on them and died where they were written. The schema now refuses them and the three role prompts say so; a fact belonging in agent instructions goes under 🔔 Maintainer, where a human reads it. What survives is a specification or reference a late discovery invalidated — and `take-on-story` harvests those at the wake that closes each task and applies them in a follow-up PR after the story's PR lands. `supersedes` is reported, never applied: it names issue criteria and specs, and editing those is the maintainer's. `rules/claude-session.md` carries the matching bound at revision 15. Two tests hold the line — every schema channel has a row in the driver's routing table, and every prompt that touches `docsCandidates` names the excluded file class.
