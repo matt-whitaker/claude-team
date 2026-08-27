@@ -1,6 +1,6 @@
 # claude-team
 
-**team-ref: mainline** · from `matt-whitaker/claude-team`
+**team-ref: v4.2** · from `matt-whitaker/claude-team`
 
 ⚠️ **This file is entirely claude-team's.** Nothing repo-specific goes in it. To upgrade, **replace
 it** — never merge. To uninstall, delete it.
