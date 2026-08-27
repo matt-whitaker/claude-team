@@ -18,7 +18,11 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** yes to adopt — re-copy `.claude/hooks/guard-push.py` (a security fix).
+**Action required:** n/a — nothing has landed since `v4.2`.
+
+## v4.2
+
+**Action required:** yes — re-copy `.claude/hooks/guard-push.py` (a security fix), `.claude/rules/` and `.claude/skills/`. ⚠️ **Supersedes `v4.1`, which no consumer should adopt**: its guard carries the `+refspec` bypass below.
 
 - **`git push origin +mainline` defeated both of guard-push's push invariants at once (#98).** `+ref` is git's own force shorthand: it strips the `+`, then parses `src[:dst]`. It carries none of the force flags, so the force check missed it, and the `+` survived into the target comparison, so `+mainline` never matched `mainline`. Shorter to type than the quoting bypass v4.1 closed, and it force-pushed the default branch. Filed by the Security role on the post-merge run of the change that introduced it. Also closed alongside it: `--all` and `--mirror`, which push the default branch without naming it and which no positional check could see, and a push target carrying `$`, `${…}` or `` ` `` — `shlex` lexes but does not expand, so such a target is now **refused rather than cleared**. That is the one place the guard fails closed on a command it parsed, scoped to the target of a push.
 - **Security files every issue with `--label bug`.** Its prompt named no label at all, and it holds `gh issue create` but not `gh issue edit`, so a label omitted at creation could never be added. `team.kind()` derives `story` from the absence of a marker, so an unlabelled security report reads as a story and gets shaped into tasks instead of fixed — and is missing from every board filter meanwhile. A test pins the flag against the allowlist that has to permit it.
