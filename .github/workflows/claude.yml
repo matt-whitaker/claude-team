@@ -64,7 +64,7 @@ jobs:
       pull-requests: write
       actions: read
       id-token: write
-    uses: matt-whitaker/claude-team/.github/workflows/team.yml@v4
+    uses: matt-whitaker/claude-team/.github/workflows/team.yml@v4.2
     with:
       project_owner: matt-whitaker
       project_number: "9"

@@ -1,6 +1,7 @@
 """⚠️ THE LAYER SPLIT IS ONLY REAL IF SOMETHING CHECKS IT.
 
-How a *session* works is `claude-harness`, installed here as `.claude/rules/claude-harness.md`.
+How a *session* works is `rules/claude-session.md`, installed here as
+`.claude/rules/claude-session.md` like any other consumer.
 How the *GitHub agents* work is this repo. One question sorts them — who invoked it — and the
 whole point of separating them is that "does this serve a purpose?" becomes answerable, because a
 file can no longer be serving the other layer.
@@ -15,20 +16,20 @@ import pathlib
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-RULE = ROOT / ".claude/rules/claude-harness.md"
+RULE = ROOT / ".claude/rules/claude-session.md"
 
 
-class TheHarnessRuleIsInstalled(unittest.TestCase):
+class TheSessionRuleIsInstalled(unittest.TestCase):
     def test_the_rule_is_present(self):
-        self.assertTrue(RULE.exists(), f"{RULE} is missing — the harness is not installed here")
+        self.assertTrue(RULE.exists(), f"{RULE} is missing — the session rule is not installed here")
 
     def test_it_records_where_it_came_from_and_at_what_revision(self):
         """⚠️ Without the marker, "is this stale?" costs a full re-read of the file every time —
         the exact cost the install exists to remove. It is also what makes the upgrade a replace
         rather than a comparison."""
         text = RULE.read_text(encoding="utf-8")
-        self.assertRegex(text, r"harness-rule-revision: \d+")
-        self.assertIn("claude-harness", text)
+        self.assertRegex(text, r"session-rule-revision: \d+")
+        self.assertIn("claude-session", text)
 
     def test_it_is_replaced_not_merged(self):
         """⚠️ Nothing of this repo's may be written into it, or an upgrade clobbers repo content
@@ -63,7 +64,7 @@ class RulesHoldInstalledModulesOnly(unittest.TestCase):
 
     def test_the_manifest_is_the_modules_and_nothing_else(self):
         found = sorted(p.name for p in self.RULES.glob("*.md"))
-        self.assertEqual(found, ["claude-harness.md"])
+        self.assertEqual(found, ["claude-session.md"])
 
     def test_this_repos_own_facts_live_in_claude_md(self):
         """The content that used to sit beside the module. It has one home, and a session reading

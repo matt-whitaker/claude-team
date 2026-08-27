@@ -1,8 +1,8 @@
-# claude-harness
+# claude-session
 
-**harness-rule-revision: 12** · from `matt-whitaker/claude-harness`
+**session-rule-revision: 15** · from `matt-whitaker/claude-team`
 
-⚠️ **This file is entirely claude-harness's.** Nothing repo-specific goes in it. To upgrade,
+⚠️ **This file is entirely claude-team's — the session half.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
 
 ⚠️ **`.claude/rules/` HOLDS INSTALLED MODULES. A REPO'S OWN INSTRUCTIONS GO IN ITS `CLAUDE.md`.**
@@ -116,20 +116,21 @@ in the commit and the PR.
 ⚠️ **A *why* that changes what you do is a fact, and stays** — a constraint, a trap, a reason the
 obvious thing is wrong. A *why* that only argues the line deserves to be there is the kind to cut.
 
-## claude-team, if this repo has it
+## Working on the team
 
-`claude-team` is the GitHub-agent orchestration, installed separately into `.claude-team/` and
-`.github/`. You will be asked to **act on** it — investigate a failed run, diagnose a workflow
-failure, repair what the custodian could not, trigger a workflow, open a PR to move a story along.
-Do that.
+The GitHub-agent orchestration ships from the same place this file does — its workflow in
+`.github/`, its overlays in `.claude-team/`, its prompts and hooks fetched at the pin. You will be
+asked to **act on** it: investigate a failed run, diagnose a workflow failure, repair what the
+custodian could not, trigger a workflow, open a PR to move a story along. Do that.
 
-⚠️ **Read how it behaves from `claude-team` itself** — its `CLAUDE.md`, `ONBOARDING.md` and its
-prompts are the source. Nothing here summarises them: a copy drifts, and the copy is what gets
-read.
+⚠️ **Read how it behaves from the team's own files** — its `CLAUDE.md`, its `INSTALL.md`, its
+prompts, and the terse `rules/claude-team.md` beside this one. Nothing here summarises them: a copy
+drifts, and the copy is what gets read.
 
 ⚠️ **The split is by whose behaviour a fact describes.** A fact about *the session* is this file's,
 even while working on the team. A fact about *the team* is the team's, even though a session is
-what reads it.
+what reads it. Two rule files, one repo: `claude-session.md` (this — how a session conducts itself)
+and `claude-team.md` (how the team's backlog works).
 
 ### Driving a story
 
@@ -154,12 +155,28 @@ what the backlog does; this section is only how the session conducts itself whil
   story and continues. If the last posted state is stale, that IS the diagnostic.
 - **The endgame is verified, not assumed.** After the last task closes, confirm the story's PR
   exists and says what landed; a missing PR is a diagnosis to run, never a silence to leave.
+- ⚠️ **A handoff is read for its CONTENTS, not for whether it exists.** Its presence tells you the
+  author finished; its four channels are the deliverable. Two of them reach an automated reader on
+  their own — `remaining` and `testingNotes` — and two reach nobody unless the driver carries them.
+  ⚠️ **A `docsCandidates` entry names a document, never an agent-instruction file** — the schema
+  refuses those, since the Writer may not write them either. Discharge them in a follow-up PR
+  **after** the story's PR lands: the last candidate arrives from the last task, when that PR is
+  already open, and a documentation fix reviewed on its own beats one appended to a diff about
+  something else. `supersedes` is reported, never applied by hand —
+  it names an issue's criteria or a spec that now reads the old way, and editing those is the
+  maintainer's. ⚠️ **Where a finding pokes at the scope of the subject matter, ask rather than
+  act**: the licence is to discharge what the authors decided, not to widen the story.
 - ⚠️ **A parked watcher is not a plan; arm a heartbeat beside it.** A watcher dies with its
-  session, and a dead driver halts a story silently. On taking a story, also arm a scheduled
+  session, and a dead driver halts a story silently — but the commoner case is a *living* driver
+  that got interrupted between a wave finishing and the next one being labelled. Both look
+  identical from outside: a story that stopped and said nothing. On taking a story, also arm a scheduled
   re-check on a long interval (the watcher is the wake path; the heartbeat is the net). Each
   heartbeat tick is the same move as any wake: reconcile the story from GitHub, advance what
   moved, re-park what died. Driving several stories is one tick sweeping all of them, not one
   heartbeat each.
+- ⚠️ **Sweep every story you hold before going idle, and after every interruption.** Not the one you
+  were last touching — all of them. A task that closed while your attention was elsewhere leaves a
+  wave nobody will label, and nothing will wake you about it.
 - **Resume is the heartbeat's move from zero.** A fresh session handed a mid-flight story reads
   the posted state and continues; nothing about the previous driver's death needs diagnosing
   first. What makes this work is the posting discipline above — protect it before optimizing
@@ -183,7 +200,7 @@ An `InstructionsLoaded` hook logs every instruction file and why it loaded. ⚠�
 `~/.claude/settings.json`.** A hook in a project's `.claude/settings.json` does **not** run in a
 folder whose workspace-trust dialog has not been accepted, and a `-p` session never counts as
 accepting it — so a project-scoped hook that silently never fires reads exactly like a rule that
-never loaded. Setup is in `claude-harness`'s `SETUP.md`.
+never loaded. Setup is in the team's `INSTALL.md`.
 
 ⚠️ **Compaction is not the explanation.** These files reload after a `/compact` — `compact` is one
 of the hook's own `load_reason` values.
@@ -192,5 +209,5 @@ of the hook's own `load_reason` values.
 
 A local session writes it to memory. A cloud session **commits it to this repo's `CLAUDE.md`** —
 not to a rule, which is for what was installed. ⚠️ **If the lesson would be true in any repo it
-belongs upstream in `claude-harness`, not here.** Keeping one local makes it invisible to every
+belongs upstream in `claude-team`, not here.** Keeping one local makes it invisible to every
 other repo that would hit the same trap.
