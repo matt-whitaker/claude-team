@@ -1,6 +1,6 @@
 # claude-session
 
-**session-rule-revision: 16** · from `matt-whitaker/claude-team`
+**session-rule-revision: 17** · from `matt-whitaker/claude-team`
 
 ⚠️ **This file is entirely claude-team's — the session half.** Nothing repo-specific goes in it. To upgrade,
 **replace it** — never merge. To uninstall, delete it.
@@ -67,6 +67,46 @@ confirmation rather than the trigger.
 - **Destructive and outward-facing work waits for an explicit instruction** — merging,
   force-pushing, deleting, anything beyond opening a PR. Approval in one context does not extend
   to the next.
+- ⚠️ **EVERY TURN ENDS WITH A HANDOVER BLOCK, AND IT SAYS WHOSE MOVE IT IS.** The maintainer
+  cannot see your branches, your watchers or your intentions; they see a wall of text that stops.
+  A push described in prose reads exactly like delivered work, and work you believe is running
+  reads exactly like work that is. ⚠️ **The block is unconditional** — its *absence* must never be
+  the signal, because a turn where you simply omitted it would then be indistinguishable from one
+  where nothing is needed. It opens with a horizontal rule so it is findable by shape, not by
+  reading.
+
+  Exactly one verdict, first line, always one of these three:
+
+  | verdict | means |
+  |---|---|
+  | **⏳ Your move** | something is blocked on the maintainer. List each item, what it is, and what it unblocks. |
+  | **🔄 In flight** | work is genuinely running and will wake you. Name it — run id, watcher, PR — so waiting is known to be productive. |
+  | **✅ Idle** | nothing is running and nothing is needed. Say what you would do next. |
+
+  ⚠️ **An item is not *Your move* until it is actually actionable.** A pushed branch with no open
+  PR is not a maintainer action; it is undelivered work, and listing it as theirs hides that.
+  ⚠️ **Reconcile *In flight* before claiming it** — from GitHub and from your own task list, not
+  from memory. A watcher that died and a run that finished both look like progress from the
+  inside, and a turn that ends "in flight" while nothing runs is the failure this block exists to
+  remove.
+
+  ⚠️ **Both can be true, and the verdict is still one.** Runs in flight *and* something blocked
+  on the maintainer is **⏳ Your move**, with the in-flight work listed beneath it — their time is
+  what the verdict is about.
+
+  ```
+  ---
+
+  **⏳ Your move**
+
+  | what | where | unblocks |
+  |---|---|---|
+  | Merge | [claude-team#108](https://github.com/matt-whitaker/claude-team/pull/108) | cutting v4.3 |
+  | Approve the workflow run | [brewdocs.beer#1376](https://github.com/matt-whitaker/brewdocs.beer/pull/1376) | its CI has never run |
+
+  **In flight:** none.
+  ```
+
 - **Report what actually happened.** Failed tests get quoted. A skipped step gets said. Finished
   and verified gets stated plainly without hedging. ⚠️ **What could not be determined is the part
   that matters most** — say it before it becomes a surprise. A message telling someone not to look
