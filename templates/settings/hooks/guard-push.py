@@ -27,6 +27,12 @@ the false-positive mirror of the bypass and cost exactly as much.
 ⚠️ **Token-match, never substring**: a branch named `42-mainline-fix` must not trip the `mainline`
 rule. Push targets are compared as whole refs after splitting refspecs on `:`.
 
+⚠️ **`shlex` LEXES; IT DOES NOT EXPAND.** `$BRANCH`, `${BRANCH}` and `$(...)` reach git as
+whatever bash resolved them to, which this guard cannot know — so a push target carrying one is
+refused rather than cleared. That is the one place it fails closed on a command it parsed
+successfully, and it is narrow on purpose: only the target of a push, where being wrong means the
+default branch.
+
 ⚠️ **A tokenizer failure is not a licence.** An unbalanced quote makes `shlex` raise, and standing
 down there would hand back every bypass this docstring describes: a trailing `"` is the shortest
 one to type. The fallback strips quote characters and splits, which over-matches rather than
@@ -41,6 +47,11 @@ import shlex
 import sys
 
 DEFAULT_BRANCHES = {"mainline", "main", "master"}
+# Flags that push refs without naming any: --all sends every local branch, the default one
+# among them; --mirror also deletes remote refs the local clone does not have.
+UNTARGETED_PUSH = ("--all", "--mirror")
+# A token the shell would expand before git sees it. shlex lexes, it does not evaluate.
+UNRESOLVED = ("$", "`")
 # Prefixes that precede the real command without being it.
 PREFIXES = {"sudo", "command", "env", "nohup", "time", "exec", "builtin"}
 # git's own global flags that consume the following token as their value.
@@ -106,11 +117,29 @@ def main() -> None:
                        or t.startswith("--force-if-includes") for t in rest):
                     deny("guard-push: force-push is blocked here — reconcile by merge, or hand "
                          "the conflict to the maintainer. (claude-team guard)")
+                if any(t in UNTARGETED_PUSH for t in rest):
+                    deny("guard-push: --all and --mirror push the default branch without naming "
+                         "it, and --mirror deletes remote refs. Push one branch by name. "
+                         "(claude-team guard)")
                 for t in rest:
                     if t.startswith("-"):
                         continue
+                    # ⚠️ `+ref` is git's OWN force shorthand: it strips the `+`, then parses the
+                    # rest as `src[:dst]`. It carries no force flag, so the check above cannot
+                    # see it, and the `+` survives into the comparison below unless stripped —
+                    # which is how one character defeated both invariants at once.
+                    if t.startswith("+"):
+                        deny("guard-push: '+' before a refspec is a force-push — reconcile by "
+                             "merge, or hand the conflict to the maintainer. (claude-team guard)")
                     # a refspec pushes to its right-hand side; a bare ref pushes to itself
                     target = t.split(":")[-1]
+                    # ⚠️ An unexpanded token is one the guard FAILED TO READ, not one it cleared.
+                    # bash resolves `$BRANCH` before git sees it; shlex does not. Refusing is the
+                    # only honest answer, and a literal ref costs the caller nothing.
+                    if any(c in target for c in UNRESOLVED):
+                        deny(f"guard-push: '{target}' expands at run time and this guard cannot "
+                             "read it, so it cannot clear it. Write the ref literally. "
+                             "(claude-team guard)")
                     if target.removeprefix("refs/heads/") in DEFAULT_BRANCHES:
                         deny(f"guard-push: pushing to '{target}' is blocked — the default branch "
                              "changes by merged PR only. Push a branch and open the PR. "
