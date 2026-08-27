@@ -38,7 +38,7 @@
     },
     "testingNotes": {
       "type": "array",
-      "description": "For the Tester. Behaviour that a test written to distrust this change should cover \u2014 not a description of what was built. Empty when the change genuinely warrants no new coverage.",
+      "description": "For the Tester. Behaviour that a test written to distrust this change should cover — not a description of what was built. Empty when the change genuinely warrants no new coverage.",
       "items": {
         "type": "object",
         "properties": {
@@ -60,13 +60,13 @@
     },
     "docsCandidates": {
       "type": "array",
-      "description": "For the Writer. Things that cost you time to work out and would cost the next reader the same. A proposal, never an instruction \u2014 the Writer decides what earns a place. Empty when nothing cost you time.",
+      "description": "For the Writer. Things that cost you time to work out and would cost the next reader the same. A proposal, never an instruction - the Writer decides what earns a place. Empty when nothing cost you time. NEVER name an agent-instruction file: every CLAUDE.md, every AGENTS.md, anything under .claude/ or .claude-team/ is out of scope for the Writer as it is for you, so a candidate naming one has no reader that may act on it and dies where it is written. A fact that belongs in agent instructions goes in your report's maintainer section instead, where a human reads it. This is the commonest way a candidate is wasted.",
       "items": {
         "type": "object",
         "properties": {
           "file": {
             "type": "string",
-            "description": "Repo-relative path of the document that should carry it. A free string on purpose: these roles are portable and must not encode the layout of any one repository."
+            "description": "Repo-relative path of the document that should carry it - a product specification, a reference, human-facing documentation. A free string on purpose: these roles are portable and must not encode the layout of any one repository. It must be a file the Writer may edit, which excludes every agent-instruction file."
           },
           "note": {
             "type": "string",

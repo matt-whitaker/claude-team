@@ -132,6 +132,49 @@ class ShippedArtifacts(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stderr, "", "a clean run says nothing")
 
+    def test_every_handoff_channel_has_a_named_reader_in_the_driver(self):
+        """E4: every required output has a named reader. Two of the four channels reach an
+        automated one; the other two reach nobody unless the driving session carries them, so
+        the skill's routing table is where their reader is named. A channel added to the schema
+        and not to that table is a channel with no reader at all — which is how the two that
+        already existed went seventeen entries without being read."""
+        schema = json.loads((ROOT / "schemas/handoff.json").read_text(encoding="utf-8"))
+        channels = set(schema["properties"]) - {"commitMessage"}
+        skill = (ROOT / "skills/take-on-story/SKILL.md").read_text(encoding="utf-8")
+        section = skill.split("### Harvesting a handoff", 1)
+        self.assertEqual(len(section), 2, "take-on-story must carry a harvest section")
+        # The ROWS, not the prose around them: a channel discussed in a paragraph but absent
+        # from the table has no stated action, and matching loosely lets that pass.
+        rows = [ln for ln in section[1].splitlines()
+                if ln.startswith("|") and "what you do with it" not in ln
+                and set(ln) - set("|- ")]
+        self.assertTrue(rows, "the harvest section must carry a routing table")
+        routed = {c for c in channels if any(f"`{c}`" in r for r in rows)}
+        self.assertEqual(routed, channels,
+                         f"handoff channels with no row in the driver's routing table: "
+                         f"{sorted(channels - routed)} — each is forced out of every author "
+                         "and would reach no reader at all")
+
+    def test_docs_candidates_refuse_agent_instruction_files_everywhere_they_are_asked_for(self):
+        """A candidate naming a CLAUDE.md has no reader that may act on it: the Writer is barred
+        from those files exactly as the authors are, so it dies where it is written. Sixteen of
+        seventeen real candidates named one. The exclusion has to hold in the schema AND in every
+        prompt that asks an author for the field — a role told to report candidates without being
+        told what is out of bounds will name the file that cost it the most time, which is
+        reliably the instruction file."""
+        schema = json.loads((ROOT / "schemas/handoff.json").read_text(encoding="utf-8"))
+        dc = schema["properties"]["docsCandidates"]
+        blob = dc["description"] + dc["items"]["properties"]["file"]["description"]
+        self.assertIn("CLAUDE.md", blob,
+                      "the schema must name the excluded file class, not merely imply it")
+        for prompt in sorted((ROOT / "prompts").glob("*.md")):
+            text = prompt.read_text(encoding="utf-8")
+            if "docsCandidates" not in text:
+                continue
+            self.assertIn("CLAUDE.md", text,
+                          f"{prompt.name} asks for or receives docsCandidates without naming "
+                          "the agent-instruction files that may not be named in one")
+
     def test_every_skill_carries_name_and_description(self):
         self.assertTrue(SKILLS, "skills/ ships at least one skill")
         for p in SKILLS:

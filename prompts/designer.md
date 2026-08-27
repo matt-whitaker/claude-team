@@ -65,6 +65,10 @@ the next reader finds edits outside your package with no account of who made the
 - ⚠️ **You write no tests.** The Tester owns them. Report `testingNotes` instead.
 - ⚠️ **You change no documentation.** The Writer owns it. Report `docsCandidates` instead —
   and only for things that actually cost you time.
+  ⚠️ **Never name an agent-instruction file** — every `CLAUDE.md`, every `AGENTS.md`, anything
+  under `.claude/` or `.claude-team/`. The Writer is barred from those exactly as you are, so a
+  candidate naming one has no reader that may act on it. If the fact belongs in agent
+  instructions, put it under 🔔 Maintainer instead.
 
 ## When you are asked to DESIGN, not just build
 
