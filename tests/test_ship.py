@@ -98,6 +98,32 @@ class GuardPush(unittest.TestCase):
         not answer a tokenizer failure by standing down."""
         self.assert_blocked('git push origin "mainline', "an unclosed quote is not an escape")
 
+    def test_a_leading_plus_is_a_force_marker(self):
+        """`+ref` is git's own force shorthand — it strips the `+`, then parses `src[:dst]` with
+        an implicit dst. It carries none of the force FLAGS, and the `+` survives into the target
+        comparison, so both checks miss it at once. Shorter to type than the quoting bypass."""
+        self.assert_blocked("git push origin +mainline", "git's force shorthand")
+        self.assert_blocked("git push origin +refs/heads/main")
+        self.assert_blocked("git push origin +HEAD:mainline")
+        self.assert_blocked("git push origin +feature-x",
+                            "forcing a feature branch is still a force-push")
+
+    def test_pushes_that_name_no_branch_still_reach_the_default_one(self):
+        """`--all` pushes every local branch, the default one among them; `--mirror` also deletes
+        remote refs the local clone lacks. Neither names a branch, so a check that only inspects
+        positional tokens sees nothing to object to."""
+        self.assert_blocked("git push --all origin")
+        self.assert_blocked("git push --mirror origin")
+
+    def test_an_unresolvable_target_is_refused_rather_than_assumed_safe(self):
+        """shlex lexes; it does not expand. `$BRANCH` reaches git as whatever bash resolved it
+        to, which the guard cannot know — so it cannot be cleared, and a guard on the default
+        branch does not wave through what it failed to read."""
+        self.assert_blocked("BRANCH=mainline; git push origin $BRANCH")
+        self.assert_blocked("git push origin ${BRANCH}")
+        self.assert_blocked("git push origin $(cat /tmp/b)")
+        self.assert_allowed("git push origin feature-x", "a literal ref is readable and fine")
+
     def test_compound_commands_are_examined_per_segment(self):
         self.assert_blocked("git add -A && git commit -m x && git push origin mainline")
 

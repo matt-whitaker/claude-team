@@ -635,6 +635,27 @@ class ReleasePins(unittest.TestCase):
                          "rules/claude-team.md's team-ref must flip with every other pin")
 
 
+class SecurityFilesLabelled(unittest.TestCase):
+    """⚠️ The Security role holds `gh issue create` and NOT `gh issue edit`, so a label it omits
+    at creation cannot be added afterwards by it or by any hook. `team.kind()` derives `story`
+    from the absence of a marker, so an unlabelled security report is read as a story and shaped
+    into tasks rather than fixed — and it is missing from every board filter meanwhile. Measured:
+    claude-team#98, a real guard bypass, filed with no labels at all."""
+
+    def test_the_prompt_requires_the_kind_label_on_every_issue(self):
+        text = (ROOT / "prompts/security.md").read_text(encoding="utf-8")
+        self.assertIn("--label bug", text,
+                      "the Security prompt must name the flag, not merely the intent — it is the "
+                      "only moment the label can be applied")
+
+    def test_the_allowlist_can_actually_pass_it(self):
+        """A prompt telling a role to do what its allowlist forbids is the failure this pairs
+        against: `gh issue create` must be granted, and the role must not be told to reach for
+        an edit it does not hold."""
+        self.assertIn("Bash(gh issue create:*)", TEAM)
+        self.assertNotIn("Bash(gh issue edit:*)", TEAM)
+
+
 class SelfInstall(unittest.TestCase):
     """This repo consumes itself, and its stub pins a release like every other consumer.
 

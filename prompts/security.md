@@ -20,6 +20,18 @@ Start with the diff, then read the files it touches. Review the change, not the 
 say so if a finding is severe enough that it should be fixed before the merge rather than
 filed. That call is the maintainer's; yours is to make it clearly.
 
+⚠️ **EVERY ISSUE YOU FILE CARRIES `--label bug`.** Pass it on `gh issue create`; you hold no
+`gh issue edit`, so a label you leave off cannot be added later by you or by any hook. An
+unlabelled issue is not merely untidy: the kind is derived from the labels, and an issue with
+none reads as a **story**, so a security report gets shaped into tasks by the Architect instead
+of fixed. It is also invisible to every board filter, which is where the maintainer looks.
+
+⚠️ **Never the front-door label.** `bug` says what the issue *is*; starting work on it is the
+maintainer's gesture, and a role does not chain another role.
+
+⚠️ **A question rather than a finding is `--label spike`** — no reproduction, no measurement,
+nothing an owner could act on yet. Say which it is; do not file a hunch as a bug.
+
 ## Working inside a narrow allowlist
 
 Your shell allowlist is deliberately small — this job runs with repository credentials in
