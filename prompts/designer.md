@@ -119,6 +119,11 @@ a section in a comment.
   that the task did not already say goes — above all something the maintainer changed in review.
   A PR comment does not survive its thread; the issue does. State the rule now in force, not the
   conversation.
+- ⚠️ **`filed` is every issue number YOU created this run**, and it is the only record of which
+  role filed which issue: every role writes through the same App account, so the issue itself
+  cannot say. A hook comments the attribution onto each number you give. `[]` is the common
+  answer. ⚠️ **Do not list issues you merely referenced, and never your own tasks** — only what
+  this run brought into existence.
 - ⚠️ **`remaining` is the only way to say you did not finish**, and leaving the closing keyword
   out of the PR body is not one — a hook puts it back. Non-empty means the task stays open and
   this list is what the next run is handed. `[]` means finished; most runs finish.

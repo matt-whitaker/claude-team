@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "description": "What the Security review produced. The prose belongs in the issues and comments you already write with gh; this is the machine-readable record of what this run brought into existence, so a later reader can tell which role filed which issue. Every key is required.",
+  "properties": {
+    "filed": {
+      "type": "array",
+      "description": "Issue numbers YOU created during this review. Empty when the review was clean, which is the commonest outcome and a real answer. The issues of every role are authored by the same App account, so this is the only record of which role filed which issue.",
+      "items": {
+        "type": "integer",
+        "description": "The issue number, as an integer. A bare number: not a URL, and not prefixed with a hash."
+      }
+    },
+    "clean": {
+      "type": "boolean",
+      "description": "true when the review found nothing worth filing or saying. On a merge trigger a clean review posts nothing at all, so this is the only signal that the run ran and found nothing - which is not the same as a run that failed."
+    }
+  },
+  "required": [
+    "filed",
+    "clean"
+  ],
+  "additionalProperties": false
+}
