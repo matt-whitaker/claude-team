@@ -93,6 +93,34 @@ class GuardPush(unittest.TestCase):
         self.assert_allowed('echo "git push origin mainline"')
         self.assert_allowed("gh pr list --search 'merge'")
 
+    def test_grouping_syntax_is_not_a_command_of_its_own(self):
+        """A subshell or a brace group WRAPS a command; it is not one. bash splits the leading
+        `(` off as an operator before the word `git`, so a lexer that glues it onto that word
+        reads a first token matching neither the program nor a prefix, and every check below it
+        is skipped while bash runs the push exactly as written. The closing character is the
+        same failure at the other end: it rides on the branch name, and the target stops
+        matching the set it is compared against."""
+        self.assert_blocked("(git push origin mainline)", "a subshell")
+        self.assert_blocked("( git push origin main )", "a spaced subshell")
+        self.assert_blocked("{ git push origin mainline ; }", "a brace group")
+        self.assert_blocked("(cd /tmp && git push origin mainline)",
+                            "the closing paren rides on the target")
+        self.assert_blocked("(git push --force origin feature-x) &", "a backgrounded subshell")
+        self.assert_blocked("(gh pr merge 42)", "the merge check falls the same way")
+
+    def test_grouping_characters_inside_an_argument_are_still_text(self):
+        """The mirror-image failure. A parenthesis inside a quoted argument is part of that
+        argument, and treating grouping as structure wherever it appears would block describing
+        this very guard."""
+        self.assert_allowed('git commit -m "explain the (guard) rule"')
+        self.assert_allowed('gh issue create --body "reproduce: (git push origin mainline)"')
+
+    def test_a_hash_does_not_truncate_the_command(self):
+        """A lexer configured with a comment character drops every token after one, so a check
+        reads a command that stops early — and `#` is ordinary in an issue reference, a colour
+        or a URL fragment."""
+        self.assert_blocked("git push origin mainline  # closes 105")
+
     def test_unbalanced_quotes_never_relax_a_check(self):
         """An unparseable line is not a licence. bash would reject it too, but the guard must
         not answer a tokenizer failure by standing down."""

@@ -14,10 +14,23 @@ default branch" true of a session the way the workflow's permissions make it tru
 RUNS.** bash strips quotes before `git` ever sees an argument, so `git push origin "mainline"`
 executes identically to the bare form — but a whitespace split sees the token `"mainline"`, which
 is not the word in the set, and the guard stands down. Every protection here is defeated by one
-ordinary quote under `str.split()`. `shlex.split()` is what closes it, and both failure directions
+ordinary quote under `str.split()`. Real lexing is what closes it, and both failure directions
 have the same root: without real tokenization there is no notion of an argument boundary, so a
 quoted branch name reads as a different branch and a command *described inside* an issue body
 reads as that command being run.
+
+⚠️ **GROUPING SYNTAX WRAPS A COMMAND; IT IS NOT ONE.** bash splits a leading `(` off as its own
+operator before the word `git`, and `shlex.split()` does not — it returns the parenthesis glued
+onto that word. The first token then matches neither the program nor a prefix, so every check
+below is skipped while bash runs `(git push origin mainline)` exactly as written. `punctuation_chars`
+makes the lexer split the characters bash treats as operators, and grouping tokens are then dropped
+the same way `sudo` or an env assignment is. The closing character is the same failure at the other
+end: `(cd /tmp && git push origin mainline)` leaves `mainline)` as the target, and a token compared
+against a set of whole refs no longer matches one.
+
+⚠️ **The lexer must carry no comment character.** `shlex.shlex` defaults to treating `#` as one
+where `shlex.split()` does not, and every token after a `#` would vanish — an issue reference, a
+colour, a URL fragment — leaving the guard to inspect a command that stops early.
 
 ⚠️ **Match on position, never on co-presence.** `gh pr merge` is a program and two subcommands in
 sequence; three trigger words appearing somewhere in a line is a sentence. Reading co-presence
@@ -54,6 +67,11 @@ UNTARGETED_PUSH = ("--all", "--mirror")
 UNRESOLVED = ("$", "`")
 # Prefixes that precede the real command without being it.
 PREFIXES = {"sudo", "command", "env", "nohup", "time", "exec", "builtin"}
+# bash grouping. A subshell or brace group stands around a command without being part of it, at
+# either end — the opener hides the program name, the closer rides on the push target.
+GROUPING = {"(", ")", "{", "}"}
+# The same characters, for the over-matching fallback, which has no lexer to split them off.
+GROUPING_CHARS = re.compile(r"[(){}]")
 # git's own global flags that consume the following token as their value.
 GIT_VALUE_FLAGS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
@@ -67,15 +85,21 @@ def deny(reason: str) -> None:
 def tokenize(segment: str) -> list[str]:
     """Shell-accurate tokens, or an over-matching approximation when the line will not parse."""
     try:
-        return shlex.split(segment)
+        lex = shlex.shlex(segment, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        lex.commenters = ""
+        return list(lex)
     except ValueError:
-        return segment.replace('"', " ").replace("'", " ").split()
+        stripped = segment.replace('"', " ").replace("'", " ")
+        return GROUPING_CHARS.sub(" ", stripped).split()
 
 
 def command_tokens(tokens: list[str]) -> list[str]:
-    """Drop leading env assignments and prefix programs so tokens[0] is the command itself."""
+    """Drop leading env assignments, grouping syntax and prefix programs so tokens[0] is the
+    command itself."""
     i = 0
-    while i < len(tokens) and (ASSIGNMENT.match(tokens[i]) or tokens[i] in PREFIXES):
+    while i < len(tokens) and (ASSIGNMENT.match(tokens[i]) or tokens[i] in PREFIXES
+                               or tokens[i] in GROUPING):
         i += 1
     return tokens[i:]
 
@@ -112,7 +136,7 @@ def main() -> None:
         if tokens[0] == "git":
             sub = git_subcommand(tokens)
             if sub is not None and tokens[sub] == "push":
-                rest = tokens[sub + 1:]
+                rest = [t for t in tokens[sub + 1:] if t not in GROUPING]
                 if any(t in ("--force", "-f") or t.startswith("--force-with-lease")
                        or t.startswith("--force-if-includes") for t in rest):
                     deny("guard-push: force-push is blocked here — reconcile by merge, or hand "
@@ -147,7 +171,7 @@ def main() -> None:
 
         if tokens[0] == "gh":
             # gh's own flags may precede the subcommand pair; the pair itself is adjacent.
-            words = [t for t in tokens[1:] if not t.startswith("-")]
+            words = [t for t in tokens[1:] if not t.startswith("-") and t not in GROUPING]
             if any(a == "pr" and b == "merge" for a, b in zip(words, words[1:])):
                 deny("guard-push: merging is the maintainer's — open or update the PR and hand "
                      "over the link. (claude-team guard)")
