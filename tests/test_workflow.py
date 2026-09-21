@@ -2,9 +2,18 @@ import os
 import json
 import pathlib
 import re
+import shutil
+import sys
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+# ⚠️ The list of release pins lives in the release tool, and this suite asserts against it rather
+# than restating it. Two copies is two places to forget when a sixth pin appears, and a pin nobody
+# remembered is exactly how a tag shipped pointing at the edge.
+sys.path.insert(0, str(ROOT / "scripts"))
+import release_pins  # noqa: E402
 TEAM = (ROOT / ".github/workflows/team.yml").read_text()
 # Hooks are invoked from team.yml and from the composite actions it calls; an env var a hook
 # reads may be set at either, so the wiring check scans their union.
@@ -610,30 +619,110 @@ class ReleasePins(unittest.TestCase):
     moves one without the rest ships a workflow fetching assets from a different version of
     itself — the drift this suite exists to make impossible."""
 
-    def refs(self):
-        import re
-        team_ref = re.search(r"TEAM_REF: (\S+)", TEAM).group(1)
-        action_refs = set(re.findall(r"uses: matt-whitaker/claude-team/[^@\n]+@(\S+)", TEAM))
-        prompt_default = re.search(r"ref:\n    description[^\n]*\n    required: false\n    default: (\S+)", ACTION).group(1)
-        stub_ref = re.search(r"uses: matt-whitaker/claude-team/\.github/workflows/team\.yml@(\S+)", STUB).group(1)
-        return team_ref, action_refs, prompt_default, stub_ref
-
     def test_all_pins_agree(self):
-        team_ref, action_refs, prompt_default, stub_ref = self.refs()
-        self.assertEqual(action_refs, {team_ref})
-        self.assertEqual(prompt_default, team_ref)
-        self.assertEqual(stub_ref, team_ref)
+        """⚠️ Read through the release tool, so a pin added there is covered here the same day.
+        Asserting agreement is all this can do on mainline: every pin is `mainline` and that is
+        correct, so the value a TAG must carry — its own name — is checked by `release-check.yml`
+        against the cut tag and nowhere else."""
+        refs = {ref for _, _, ref in release_pins.read(ROOT)}
+        self.assertEqual(len(refs), 1,
+                         f"the release pins disagree: {sorted(refs)}. A release that moves one "
+                         "without the rest ships a workflow fetching assets from another "
+                         "version of itself.")
+
+    def test_every_pin_site_still_matches_its_file(self):
+        """⚠️ A pattern that drifts away from its file matches nothing and stays silent, leaving
+        that pin behind on every release from then on. `read` raises rather than returning short."""
+        for rel, pattern, what in release_pins.PINS:
+            with self.subTest(pin=what):
+                text = (ROOT / rel).read_text(encoding="utf-8")
+                self.assertRegex(text, pattern, f"{rel}: no pin matched for {what}")
 
     def test_the_rules_team_ref_moves_with_them(self):
         """The rule ships a `team-ref` that a consumer must set to its pin, and the shipped value
         is what an installer copies — so it is a pin like the others and drifts the same way. It
         sat at an older release for two versions because only its SHAPE was asserted, never its
         value against the rest."""
-        import re
-        team_ref, _, _, _ = self.refs()
+        team_ref = re.search(r"TEAM_REF: (\S+)", TEAM).group(1)
         rule_ref = re.search(r"\*\*team-ref: (\S+)\*\*", RULE).group(1)
         self.assertEqual(rule_ref, team_ref,
                          "rules/claude-team.md's team-ref must flip with every other pin")
+
+    def test_the_self_install_is_not_one_of_them(self):
+        """⚠️ `.github/workflows/claude.yml` pins a RELEASE on mainline, which every other pin
+        must never do. It is this repo's own consumer stub and moves in an ordinary PR after the
+        tag exists; flipping it with the rest would put a `vN` on mainline — the defect the
+        never-merged release commit exists to avoid."""
+        self.assertNotIn(".github/workflows/claude.yml", {rel for rel, _, _ in release_pins.PINS})
+
+
+class ReleaseTooling(unittest.TestCase):
+    """⚠️ Cutting a release moved 22 pins across four files by hand, and one release shipped with
+    all of them still at `mainline` — a tag whose consumers would have resolved `team.yml` at the
+    tag and then cloned the edge at run time. The suite could not see it: on mainline the pins
+    agree, correctly, and nothing ran against the tag.
+
+    ⚠️ The tool edits a working tree and nothing else. The commit and the tag stay the
+    maintainer's, so these tests assert what it writes, never that a release happened."""
+
+    def tree(self):
+        """A copy of every file the tool touches, plus the one it must not."""
+        dest = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, dest, ignore_errors=True)
+        for rel in {rel for rel, _, _ in release_pins.PINS} | {".github/workflows/claude.yml"}:
+            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / rel, dest / rel)
+        return dest
+
+    def test_set_moves_every_pin(self):
+        dest = self.tree()
+        release_pins.set_ref(dest, "v9.9")
+        self.assertEqual({ref for _, _, ref in release_pins.read(dest)}, {"v9.9"})
+
+    def test_set_rewrites_the_ref_and_nothing_else(self):
+        """A substitution that eats its surroundings passes an equality check on the ref while
+        corrupting the line it sits on."""
+        dest = self.tree()
+        before = (dest / "rules/claude-team.md").read_text(encoding="utf-8")
+        release_pins.set_ref(dest, "v9.9")
+        after = (dest / "rules/claude-team.md").read_text(encoding="utf-8")
+        self.assertEqual(before.replace("**team-ref: mainline**", "**team-ref: v9.9**"), after)
+
+    def test_the_self_install_is_never_touched(self):
+        dest = self.tree()
+        before = (dest / ".github/workflows/claude.yml").read_text(encoding="utf-8")
+        release_pins.set_ref(dest, "v9.9")
+        self.assertEqual(before, (dest / ".github/workflows/claude.yml").read_text(encoding="utf-8"),
+                         "the self-install pins a release in its own PR, after the tag exists")
+
+    def test_check_reports_a_pin_left_behind(self):
+        """The shape the missed release had: everything at `mainline` while the tag says v4.4."""
+        dest = self.tree()
+        self.assertTrue(release_pins.disagree(dest, "v4.4"), "unmoved pins must be reported")
+        release_pins.set_ref(dest, "v4.4")
+        self.assertEqual(release_pins.disagree(dest, "v4.4"), [])
+
+    def test_a_partial_edit_is_refused(self):
+        """⚠️ An unasserted replace that matches nothing prints success and leaves the pin behind.
+        A site whose file no longer contains it must raise, not return short."""
+        dest = self.tree()
+        (dest / "templates/consumer-stub.yml").write_text("nothing to pin here\n", encoding="utf-8")
+        with self.assertRaises(release_pins.PinMissing):
+            release_pins.set_ref(dest, "v9.9")
+
+    def test_a_ref_that_is_not_a_release_is_refused(self):
+        dest = self.tree()
+        for bad in ("4.4", "v4.4 ", "release-4.4", ""):
+            with self.subTest(ref=bad), self.assertRaises(ValueError):
+                release_pins.set_ref(dest, bad)
+
+    def test_the_tag_workflow_runs_the_check(self):
+        """⚠️ The tool is only worth having if something runs it against a cut tag — the one
+        place the required value is the tag's own name rather than anything in the repo."""
+        wf = (ROOT / ".github/workflows/release-check.yml").read_text(encoding="utf-8")
+        self.assertIn("tags:", wf)
+        self.assertIn("scripts/release_pins.py check", wf)
+        self.assertIn("github.ref_name", wf)
 
 
 class EveryJobStagesWhatItReaches(unittest.TestCase):
