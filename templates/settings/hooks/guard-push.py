@@ -89,15 +89,26 @@ PREFIXES = {"sudo", "command", "env", "nohup", "time", "exec", "builtin"}
 # bash grouping. A subshell or brace group stands around a command without being part of it, at
 # either end — the opener hides the program name, the closer rides on the push target.
 GROUPING = {"(", ")", "{", "}"}
-# Characters that end one simple command and begin the next. ⚠️ Matched by COMPOSITION, not
-# against a list of operators: the lexer fuses a run of them into one token, so `&&`, `;;`, a
-# blank line (`\n\n`) and `;\n` all arrive as single tokens no enumeration would hold.
-SEPARATOR_CHARS = frozenset(";&|\n")
 # What the lexer is told to treat as operators rather than word characters.
 PUNCTUATION = "();<>|&\n"
 OPERATOR_CHARS = frozenset(PUNCTUATION)
-# The same operators for the approximation, longest first so `&&` never reads as two `&`.
-APPROX_OPERATORS = re.compile(r"&&|\|\||;;|[();{}|&<>]")
+# bash's operators, sorted longest first so a fused run is matched greedily: `&>>` is not `&>`
+# then `>`, `&&` is not two `&`, and `>&` is not `>` then `&`.
+OPERATOR_FORMS = tuple(sorted(
+    ("&>>", "<<<", "&&", "||", ";;", ">>", "<<", "<&", ">&", "&>", "<>", "|&",
+     "(", ")", "&", "|", ";", "<", ">", "\n"), key=len, reverse=True))
+# Of those, the ones that END a simple command.
+# ⚠️ A REDIRECTION DOES NOT, and three of them contain `&`: `2>&1`, `&>`, `&>>`. Deciding this
+# by character membership reads `>&` as `>` then `&`, ends the command at that `&`, and never
+# reaches the target — `git push 2>&1 origin mainline` pushes with nothing inspected. The same
+# character means different things depending on its neighbour, so the operator is what decides,
+# never the characters in it.
+COMMAND_SEPARATORS = frozenset({";", ";;", "&", "&&", "|", "||", "|&", "\n"})
+# Tokens that stand beside a command without being part of it, at either end.
+OPERATOR_TOKENS = frozenset(OPERATOR_FORMS) | GROUPING
+# The same operators for the approximation, longest first for the same reason.
+APPROX_OPERATORS = re.compile(
+    "|".join(re.escape(form) for form in OPERATOR_FORMS if form != "\n") + r"|[{}]")
 # git's own global flags that consume the following token as their value.
 GIT_VALUE_FLAGS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
@@ -121,17 +132,25 @@ def operators(token: str) -> list[str]:
 
     ⚠️ The lexer returns adjacent operator characters as ONE token, so `$(…); rc=$?` yields
     `);` — which is neither a separator nor grouping, so the command never ends and whatever
-    follows is read as an argument to it. Splitting at each separator/non-separator boundary
-    gives back `)` and `;`, and leaves genuine pairs like `&&` and a blank line intact."""
+    follows is read as an argument to it. It must come back as `)` and `;`.
+
+    ⚠️ **Splitting at each separator/non-separator boundary does that and breaks redirection.**
+    `>&` comes back as `>` and `&`, and `&` on its own ends a command — so a segment stops
+    before the target it was supposed to inspect. Longest match against the operator list is
+    what gets both right, because `&` means one thing beside `&` and another beside `>`."""
     parts: list[str] = []
-    current = ""
-    for char in token:
-        if current and (char in SEPARATOR_CHARS) != (current[-1] in SEPARATOR_CHARS):
-            parts.append(current)
-            current = ""
-        current += char
-    if current:
-        parts.append(current)
+    i = 0
+    while i < len(token):
+        for form in OPERATOR_FORMS:
+            if token.startswith(form, i):
+                parts.append(form)
+                i += len(form)
+                break
+        else:
+            # ⚠️ Not an operator this knows. Kept as its own token rather than folded into a
+            # neighbour, so an unrecognised character can never become part of a separator.
+            parts.append(token[i])
+            i += 1
     return parts
 
 
@@ -154,7 +173,7 @@ def segments(command: str) -> list[list[str]]:
     found: list[list[str]] = []
     current: list[str] = []
     for token in expanded:
-        if token and not (set(token) - SEPARATOR_CHARS):
+        if token in COMMAND_SEPARATORS:
             if current:
                 found.append(current)
             current = []
@@ -207,7 +226,7 @@ def main() -> None:
         if tokens[0] == "git":
             sub = git_subcommand(tokens)
             if sub is not None and tokens[sub] == "push":
-                rest = [t for t in tokens[sub + 1:] if t not in GROUPING]
+                rest = [t for t in tokens[sub + 1:] if t not in OPERATOR_TOKENS]
                 if any(t in ("--force", "-f") or t.startswith("--force-with-lease")
                        or t.startswith("--force-if-includes") for t in rest):
                     deny("guard-push: force-push is blocked here — reconcile by merge, or hand "
@@ -242,7 +261,8 @@ def main() -> None:
 
         if tokens[0] == "gh":
             # gh's own flags may precede the subcommand pair; the pair itself is adjacent.
-            words = [t for t in tokens[1:] if not t.startswith("-") and t not in GROUPING]
+            words = [t for t in tokens[1:]
+                     if not t.startswith("-") and t not in OPERATOR_TOKENS]
             if any(a == "pr" and b == "merge" for a, b in zip(words, words[1:])):
                 deny("guard-push: merging is the maintainer's — open or update the PR and hand "
                      "over the link. (claude-team guard)")
