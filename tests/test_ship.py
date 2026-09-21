@@ -126,6 +126,43 @@ class GuardPush(unittest.TestCase):
         not answer a tokenizer failure by standing down."""
         self.assert_blocked('git push origin "mainline', "an unclosed quote is not an escape")
 
+    def test_a_newline_ends_a_command(self):
+        """A two-line Bash call is an everyday shape, not an adversarial one — a `cd` above a
+        `git`, any block written across lines instead of joined with `;`. If a newline is not a
+        separator the whole blob collapses into one segment, the first word of the FIRST line
+        decides what the guard inspects, and everything below it is unreachable."""
+        self.assert_blocked("echo hi\ngit push origin mainline")
+        self.assert_blocked("echo hi\ngit push --force origin feature-x")
+        self.assert_blocked("ls -la\ngh pr merge 42 --squash")
+        self.assert_blocked("cd /tmp\n\ngit push origin main", "blank lines are still newlines")
+        self.assert_blocked("cd /tmp && echo hi\ngit push origin mainline",
+                            "a newline and an operator segment the same line")
+
+    def test_a_separator_inside_quotes_is_text(self):
+        """The mirror. Segmenting the raw string before anything knows what is quoted makes a
+        `;` or `&&` inside an argument a separator, and the piece to its right can begin with
+        the word `git` — so a command that pushes nothing is blocked as one that does. Writing
+        about a push, and scripting over data that contains a shell separator, are both ordinary
+        work in a repo whose subject is this guard."""
+        self.assert_allowed("probe 'echo hi; git push origin mainline'",
+                            "a quoted argument is one token, separators and all")
+        self.assert_allowed('gh issue create --body "run: git add -A && git push origin mainline"')
+        self.assert_allowed('git commit -m "first; then git push origin mainline"')
+        self.assert_allowed('echo "line one\ngit push origin mainline"',
+                            "a newline inside quotes is text, not a separator")
+
+    def test_the_prescribed_push_idiom_is_not_blocked(self):
+        """⚠️ The session rules require capturing a push's status rather than piping it, because
+        a piped push reports the exit code of the last stage and a REJECTED push reads as
+        success. The guard must not refuse the idiom its own rules mandate — and a lexer returns
+        adjacent operator characters as one token, so the `);` closing that capture is neither a
+        separator nor grouping, and the command never ends."""
+        self.assert_allowed("out=$(git push -u origin my-feature 2>&1); rc=$?")
+        self.assert_allowed("out=$(git push origin my-feature); echo done")
+        self.assert_blocked("out=$(git push origin mainline); rc=$?",
+                            "capturing the output of a blocked push does not clear it")
+        self.assert_blocked("(git push --force origin feature-x); echo done")
+
     def test_a_leading_plus_is_a_force_marker(self):
         """`+ref` is git's own force shorthand — it strips the `+`, then parses `src[:dst]` with
         an implicit dst. It carries none of the force FLAGS, and the `+` survives into the target

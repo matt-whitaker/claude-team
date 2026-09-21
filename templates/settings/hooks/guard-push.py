@@ -32,6 +32,25 @@ against a set of whole refs no longer matches one.
 where `shlex.split()` does not, and every token after a `#` would vanish — an issue reference, a
 colour, a URL fragment — leaving the guard to inspect a command that stops early.
 
+⚠️ **SEGMENTING AND TOKENIZING ARE ONE PASS, AND THE LEXER DOES BOTH.** Splitting the raw line
+into commands before anything knows what is quoted gets both directions wrong at once, and the
+same regex is responsible for each. It cannot see that a separator is *inside* an argument, so
+`probe 'echo hi; git push origin mainline'` is cut in two and the right-hand piece — text a
+function was handed — is inspected as an invocation. And it cannot see that a **newline** ends a
+command, so `echo hi` above a push collapses into one segment whose first word is `echo` and
+everything below it is unreachable. A two-line Bash call is the ordinary shape, not an
+adversarial one. The lexer knows quoting and it knows operators, so it produces the boundaries:
+split the token stream on the separator tokens it emitted, never the string on a pattern.
+
+⚠️ **A newline is an operator here, not whitespace.** `shlex` counts it as whitespace by default
+and would discard it, which is the same as not splitting on it at all.
+
+⚠️ **A heredoc body reads as commands, and that cost is accepted.** `shlex` has no notion of
+`<<EOF`, so a line inside one beginning with `git push` is a segment like any other and writing
+that file through the shell is refused. The only way to avoid it is to stop splitting on
+newlines, which is the bypass above — so the body is over-matched on purpose. Write such a file
+with a tool that is not the shell.
+
 ⚠️ **Match on position, never on co-presence.** `gh pr merge` is a program and two subcommands in
 sequence; three trigger words appearing somewhere in a line is a sentence. Reading co-presence
 blocks `gh issue create --body "...gh pr merge..."` — filing a report about this guard — which is
@@ -48,9 +67,9 @@ default branch.
 
 ⚠️ **A tokenizer failure is not a licence.** An unbalanced quote makes `shlex` raise, and standing
 down there would hand back every bypass this docstring describes: a trailing `"` is the shortest
-one to type. The fallback strips quote characters and splits, which over-matches rather than
-under-matches. Only a malformed *event* fails open — that is the harness changing shape, not a
-command evading a check.
+one to type. The approximation drops quote characters and spaces the operators out itself, which
+over-matches rather than under-matches. Only a malformed *event* fails open — that is the harness
+changing shape, not a command evading a check.
 """
 from __future__ import annotations
 
@@ -70,8 +89,15 @@ PREFIXES = {"sudo", "command", "env", "nohup", "time", "exec", "builtin"}
 # bash grouping. A subshell or brace group stands around a command without being part of it, at
 # either end — the opener hides the program name, the closer rides on the push target.
 GROUPING = {"(", ")", "{", "}"}
-# The same characters, for the over-matching fallback, which has no lexer to split them off.
-GROUPING_CHARS = re.compile(r"[(){}]")
+# Characters that end one simple command and begin the next. ⚠️ Matched by COMPOSITION, not
+# against a list of operators: the lexer fuses a run of them into one token, so `&&`, `;;`, a
+# blank line (`\n\n`) and `;\n` all arrive as single tokens no enumeration would hold.
+SEPARATOR_CHARS = frozenset(";&|\n")
+# What the lexer is told to treat as operators rather than word characters.
+PUNCTUATION = "();<>|&\n"
+OPERATOR_CHARS = frozenset(PUNCTUATION)
+# The same operators for the approximation, longest first so `&&` never reads as two `&`.
+APPROX_OPERATORS = re.compile(r"&&|\|\||;;|[();{}|&<>]")
 # git's own global flags that consume the following token as their value.
 GIT_VALUE_FLAGS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z_0-9]*=")
@@ -82,16 +108,61 @@ def deny(reason: str) -> None:
     sys.exit(2)
 
 
-def tokenize(segment: str) -> list[str]:
-    """Shell-accurate tokens, or an over-matching approximation when the line will not parse."""
+def approximate(command: str) -> list[str]:
+    """Over-matching tokens for a line the lexer will not parse. Quote characters are dropped
+    rather than honoured, and a newline becomes a separator, so an unbalanced quote widens what
+    is inspected instead of hiding it."""
+    flat = command.replace('"', " ").replace("'", " ").replace("\n", " ; ")
+    return APPROX_OPERATORS.sub(lambda m: f" {m.group(0)} ", flat).split()
+
+
+def operators(token: str) -> list[str]:
+    """Split a fused run of operator characters into the operators bash reads.
+
+    ⚠️ The lexer returns adjacent operator characters as ONE token, so `$(…); rc=$?` yields
+    `);` — which is neither a separator nor grouping, so the command never ends and whatever
+    follows is read as an argument to it. Splitting at each separator/non-separator boundary
+    gives back `)` and `;`, and leaves genuine pairs like `&&` and a blank line intact."""
+    parts: list[str] = []
+    current = ""
+    for char in token:
+        if current and (char in SEPARATOR_CHARS) != (current[-1] in SEPARATOR_CHARS):
+            parts.append(current)
+            current = ""
+        current += char
+    if current:
+        parts.append(current)
+    return parts
+
+
+def segments(command: str) -> list[list[str]]:
+    """Every simple command in the line, tokenized the way the shell would tokenize it."""
     try:
-        lex = shlex.shlex(segment, posix=True, punctuation_chars=True)
+        lex = shlex.shlex(command, posix=True, punctuation_chars=PUNCTUATION)
+        lex.whitespace = " \t\r"
         lex.whitespace_split = True
         lex.commenters = ""
-        return list(lex)
+        tokens = list(lex)
     except ValueError:
-        stripped = segment.replace('"', " ").replace("'", " ")
-        return GROUPING_CHARS.sub(" ", stripped).split()
+        tokens = approximate(command)
+    expanded: list[str] = []
+    for token in tokens:
+        if token and not (set(token) - OPERATOR_CHARS):
+            expanded.extend(operators(token))
+        else:
+            expanded.append(token)
+    found: list[list[str]] = []
+    current: list[str] = []
+    for token in expanded:
+        if token and not (set(token) - SEPARATOR_CHARS):
+            if current:
+                found.append(current)
+            current = []
+        else:
+            current.append(token)
+    if current:
+        found.append(current)
+    return found
 
 
 def command_tokens(tokens: list[str]) -> list[str]:
@@ -127,9 +198,9 @@ def main() -> None:
     if not command:
         sys.exit(0)
 
-    # Normalise: examine each simple command in a compound line.
-    for part in re.split(r"(?:&&|\|\||;|\|)", command):
-        tokens = command_tokens(tokenize(part))
+    # Examine each simple command in a compound line.
+    for segment in segments(command):
+        tokens = command_tokens(segment)
         if not tokens:
             continue
 
