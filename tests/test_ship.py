@@ -163,6 +163,33 @@ class GuardPush(unittest.TestCase):
                             "capturing the output of a blocked push does not clear it")
         self.assert_blocked("(git push --force origin feature-x); echo done")
 
+    def test_a_redirect_does_not_end_the_command(self):
+        """⚠️ `2>&1`, `&>`, `>&` and `&>>` are single REDIRECTION operators that happen to
+        contain `&`. Splitting a fused run wherever separator-ness changes reads `>&` as `>`
+        then `&`, and `&` alone ends a simple command — so the segment stops before the target
+        or the flag is ever seen, while bash runs one command that pushes.
+
+        ⚠️ Placement is the whole bug: a redirect AFTER the target was always caught, because
+        the dangerous token was already in the segment. `2>&1` right after the subcommand is an
+        everyday way to write it."""
+        self.assert_blocked("git push 2>&1 origin mainline", "a redirect before the target")
+        self.assert_blocked("git push 2>&1 --force origin feature-x", "before the flag")
+        self.assert_blocked("gh 2>&1 pr merge 42", "before the subcommand pair")
+        self.assert_blocked("git push &> /dev/null origin mainline")
+        self.assert_blocked("git push >& /dev/null origin mainline")
+        self.assert_blocked("git push &>> /tmp/log origin mainline")
+        self.assert_blocked("git push origin mainline 2>&1", "after the target, as ever")
+
+    def test_a_real_separator_still_ends_the_command(self):
+        """The other half: narrowing what counts as a separator must not stop `&` or `|&` from
+        ending a command, or the segmentation this replaced comes back as a bypass."""
+        self.assert_blocked("(git push --force origin feature-x) &", "a trailing background")
+        self.assert_blocked("echo hi | git push origin mainline", "a pipe")
+        self.assert_blocked("echo hi |& git push origin mainline", "bash's pipe-with-stderr")
+        self.assert_blocked("cd /tmp; git push origin mainline")
+        self.assert_allowed("out=$(git push -u origin my-feature 2>&1); rc=$?",
+                            "the capture idiom the session rules mandate")
+
     def test_a_leading_plus_is_a_force_marker(self):
         """`+ref` is git's own force shorthand — it strips the `+`, then parses `src[:dst]` with
         an implicit dst. It carries none of the force FLAGS, and the `+` survives into the target
