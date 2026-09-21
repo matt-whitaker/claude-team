@@ -18,7 +18,11 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** yes — re-copy `.claude/hooks/guard-push.py`. ⚠️ **A pin does not reach it**: every repo carries the bypassable copy until the file itself is replaced.
+**Action required:** n/a — nothing has landed since `v4.4`.
+
+## v4.4
+
+**Action required:** yes — re-copy `.claude/hooks/guard-push.py`. ⚠️ **A pin does not reach it**: every repo carries the bypassable copy until the file itself is replaced. ⚠️ **Four bypasses of the push guard are closed here and one remains** (a leading redirect, #116), so this supersedes `v4.3` without being the end of it.
 
 - **A redirection containing `&` ended the command early and hid everything after it (#119).** `2>&1`, `&>`, `>&` and `&>>` are single redirection operators that happen to contain a separator character. Splitting a fused operator run wherever separator-ness changed read `>&` as `>` then `&` — and `&` alone ends a simple command, so the segment stopped before the target or the flag was ever reached. `git push 2>&1 origin mainline`, `git push 2>&1 --force origin feature-x` and `gh 2>&1 pr merge 42` all passed the guard silently, and a redirect right after the subcommand is an everyday way to write one. ⚠️ Placement was the whole bug — the same redirect *after* the target was always caught. A fused run is now matched longest-first against bash's own operator list, so the operator decides rather than the characters in it. Found by the Security role on the post-merge review of the change that introduced it.
 - **Bash grouping syntax bypassed every check in `guard-push.py` (#105).** A subshell or a brace group wraps a command without being one, and `shlex.split()` returns the opening `(` glued onto the word after it — so the first token matched neither the program nor a known prefix and the whole inspection was skipped, while bash ran the push exactly as written. Measured against the installed hook: `(git push origin mainline)`, `{ git push origin mainline ; }`, `(cd /tmp && git push origin mainline)` and `(git push --force origin mainline) &` all cleared it, as did `(gh pr merge 42)`. The closer is the same failure at the other end — it rides on the branch name, and a target compared as a whole ref stops matching one. The lexer now splits the characters bash treats as operators, and grouping tokens are dropped the way `sudo` and an env assignment already were.
