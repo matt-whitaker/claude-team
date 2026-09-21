@@ -666,12 +666,18 @@ class ReleaseTooling(unittest.TestCase):
     maintainer's, so these tests assert what it writes, never that a release happened."""
 
     def tree(self):
-        """A copy of every file the tool touches, plus the one it must not."""
+        """A copy of every file the tool touches, plus the one it must not.
+
+        ⚠️ **Normalised to `mainline` rather than inherited from the checkout.** These tests run
+        at a cut tag as well as on mainline, and there every pin already reads the tag's own
+        name — so a case that assumes it starts at `mainline` passes on one and fails on the
+        other. Setting the state is the assertion's job, not the checkout's."""
         dest = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, dest, ignore_errors=True)
         for rel in {rel for rel, _, _ in release_pins.PINS} | {".github/workflows/claude.yml"}:
             (dest / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / rel, dest / rel)
+        release_pins.set_ref(dest, "mainline")
         return dest
 
     def test_set_moves_every_pin(self):

@@ -18,7 +18,9 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** n/a — nothing has landed since `v4.4`.
+**Action required:** no — release tooling only; nothing a consumer holds changes.
+
+- **Two release-tooling tests only passed on mainline.** They copied the working tree and assumed its pins read `mainline`, which is true there and false at a cut tag, where every pin already reads the tag's own name. `release-check.yml` runs the suite against the tag, so a correctly cut `v4.4` failed its own check on two assertions while the pin check itself passed. The fixture now sets the state it asserts against instead of inheriting it from the checkout. ⚠️ The tag was right and the tests were wrong — worth knowing, because the check reporting a red tag is the signal a release is unusable.
 
 ## v4.4
 
