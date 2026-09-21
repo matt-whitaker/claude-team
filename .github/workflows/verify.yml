@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m compileall -q hooks
+      - run: python3 -m compileall -q hooks scripts
       - run: python3 -m unittest discover -s tests -v
       # ⚠️ A `#` line inside an `if: |` block is EXPRESSION TEXT, not a comment, and it invalidates
       # the whole workflow file — yaml parsers cannot see it. Learned the 35-minute way.

@@ -1,0 +1,30 @@
+name: Release check
+run-name: "Release check · ${{ github.ref_name }}"
+
+# ⚠️ THE ONLY CHECK THAT READS A CUT TAG. Verify runs on `pull_request` and on pushes to
+# mainline, and the release commit is never merged — so nothing ran against a tag at all, and a
+# tag shipped with its pins still at `mainline`. A consumer pinning it would have resolved
+# team.yml at the tag and then cloned the edge at run time, silently, forever.
+#
+# ⚠️ The suite cannot assert this on mainline. There every pin is `mainline` and they agree,
+# which is correct for mainline; what a tag needs is that they equal the tag's own NAME, and
+# that is a value the repo cannot know from its contents.
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  Release-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # The tag name reaches the script through the environment rather than an expression
+      # interpolated into the shell, so a ref name can never be read as command text.
+      - name: Every pin equals the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python3 scripts/release_pins.py check "$TAG"
+      - run: python3 -m compileall -q hooks scripts
+      - run: python3 -m unittest discover -s tests
