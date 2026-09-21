@@ -18,7 +18,9 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 ## Unreleased
 
-**Action required:** n/a — nothing has landed since `v4.3`.
+**Action required:** yes — re-copy `.claude/hooks/guard-push.py`. ⚠️ **A pin does not reach it**: every repo carries the bypassable copy until the file itself is replaced.
+
+- **Bash grouping syntax bypassed every check in `guard-push.py` (#105).** A subshell or a brace group wraps a command without being one, and `shlex.split()` returns the opening `(` glued onto the word after it — so the first token matched neither the program nor a known prefix and the whole inspection was skipped, while bash ran the push exactly as written. Measured against the installed hook: `(git push origin mainline)`, `{ git push origin mainline ; }`, `(cd /tmp && git push origin mainline)` and `(git push --force origin mainline) &` all cleared it, as did `(gh pr merge 42)`. The closer is the same failure at the other end — it rides on the branch name, and a target compared as a whole ref stops matching one. The lexer now splits the characters bash treats as operators, and grouping tokens are dropped the way `sudo` and an env assignment already were. ⚠️ **A newline still defeats it** (#85): the segment split has no newline in its pattern, so `echo hi` on the line above a push carries it past the guard. That is open and unfixed here.
 
 ## v4.3
 
