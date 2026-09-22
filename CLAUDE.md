@@ -15,6 +15,24 @@ say what is in `## Unreleased` that a consumer would want, and stop. ⚠️ It i
 gap to work around: a cloud session cannot push a tag at all, so the half it *can* do — a commit
 with the pins flipped — is the half that is dangerous on its own.
 
+⚠️ **HANDING OVER A RELEASE MEANS `release_pins.py steps <version>`, AND NOTHING A SESSION TYPED
+ITSELF.** A session that cannot run the procedure cannot test the procedure, so commands it
+composes from memory are unverified text that looks like a runbook. Every one of these shipped in
+a handover and each one failed silently:
+
+| what a hand-written block did | what it looked like |
+|---|---|
+| deleted the remote tag, left the local one, pushed it back | a tag that did not move |
+| `&&` between the steps | the step that failed scrolled past |
+| `checkout --detach mainline`, not `origin/mainline` | a release cut from a stale local ref |
+| no pin check between the commit and the push | the defect the check exists to catch, shipped |
+
+⚠️ **The tool resolves the refs and prints the block; the session pastes what it printed.** It
+states the exact base, one command per line so a failure stops where it happened, and a
+verification before the tag is pushed and after. ⚠️ **A session that describes the steps in prose
+instead has not handed over a release** — name the base and give the block, every time, even when
+it looks like the same five lines as last time.
+
 ⚠️ **Every repo pins `@vN`, this one included.** Nothing tracks `@mainline`: a consumer runs a
 released version and moves when its pin moves, which is what makes "what is this repo running"
 answerable from its stub alone. `SelfInstall` asserts this repo's own stub pins a release like any

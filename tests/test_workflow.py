@@ -666,12 +666,18 @@ class ReleaseTooling(unittest.TestCase):
     maintainer's, so these tests assert what it writes, never that a release happened."""
 
     def tree(self):
-        """A copy of every file the tool touches, plus the one it must not."""
+        """A copy of every file the tool touches, plus the one it must not.
+
+        ⚠️ **Normalised to `mainline` rather than inherited from the checkout.** These tests run
+        at a cut tag as well as on mainline, and there every pin already reads the tag's own
+        name — so a case that assumes it starts at `mainline` passes on one and fails on the
+        other. Setting the state is the assertion's job, not the checkout's."""
         dest = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, dest, ignore_errors=True)
         for rel in {rel for rel, _, _ in release_pins.PINS} | {".github/workflows/claude.yml"}:
             (dest / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(ROOT / rel, dest / rel)
+        release_pins.set_ref(dest, "mainline")
         return dest
 
     def test_set_moves_every_pin(self):
@@ -715,6 +721,39 @@ class ReleaseTooling(unittest.TestCase):
         for bad in ("4.4", "v4.4 ", "release-4.4", ""):
             with self.subTest(ref=bad), self.assertRaises(ValueError):
                 release_pins.set_ref(dest, bad)
+
+    def test_the_steps_block_carries_what_a_hand_written_one_lost(self):
+        """⚠️ A session cannot run a release, so it cannot test a release procedure — commands it
+        composes from memory are unverified text shaped like a runbook. Each assertion here is a
+        line that a hand-written handover left out, and each omission silently produced a tag
+        that had not moved."""
+        block = release_pins.STEPS.format(ref="v9.9", base=release_pins.DEFAULT_BRANCH)
+        self.assertIn("git tag -d v9.9", block,
+                      "a stale LOCAL tag makes `git tag` refuse, and the push then ships the old one")
+        self.assertIn("git push origin :refs/tags/v9.9", block, "the remote tag must be dropped")
+        self.assertIn("checkout --detach origin/mainline", block,
+                      "a local branch may be behind the remote it is named after")
+        self.assertIn("release_pins.py check v9.9", block,
+                      "the pins must be verified between the edit and the commit")
+        self.assertIn("git ls-remote --tags origin refs/tags/v9.9", block,
+                      "without reading the tag back, a push that changed nothing looks identical")
+        commands = [ln for ln in block.splitlines() if ln.strip() and not ln.startswith("#")]
+        self.assertTrue(commands, "the block must contain commands, not only prose")
+        for line in commands:
+            with self.subTest(line=line):
+                self.assertNotIn("&&", line.split("#")[0],
+                                 "chained steps hide which one failed, which is how this "
+                                 "went wrong")
+
+    def test_steps_refuses_a_ref_that_is_not_a_release(self):
+        self.assertEqual(release_pins.main(["release_pins.py", "steps", "4.4"]), 1)
+
+    def test_every_command_the_block_names_is_one_this_tool_has(self):
+        """A block naming a subcommand that does not exist is a runbook that dies halfway."""
+        block = release_pins.STEPS.format(ref="v9.9", base=release_pins.DEFAULT_BRANCH)
+        for verb in re.findall(r"release_pins\.py (\w+)", block):
+            with self.subTest(verb=verb):
+                self.assertIn(verb, ("check", "set", "steps"))
 
     def test_the_tag_workflow_runs_the_check(self):
         """⚠️ The tool is only worth having if something runs it against a cut tag — the one
