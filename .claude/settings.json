@@ -13,5 +13,16 @@
       }
     ]
   },
-  "outputStyle": "Concise"
+  "outputStyle": "Concise",
+  "effortLevel": "high",
+  "theme": "dark",
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash(gh issue create:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git push:*)"
+    ]
+  }
 }
