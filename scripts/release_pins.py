@@ -20,6 +20,7 @@ file fails loudly instead of leaving that pin behind.
 
     release_pins.py check v4.4    # assert every pin is v4.4; annotate and exit 1 if not
     release_pins.py set   v4.4    # rewrite every pin to v4.4, in the working tree
+    release_pins.py steps v4.4    # print the exact commands that cut v4.4
     release_pins.py check mainline
 
 `check` is what runs against a cut tag, where the pins must equal the tag's own name. On mainline
@@ -57,6 +58,34 @@ PINS = (
 
 # What this repo pins: a release, or the edge that mainline sits at between releases.
 VALID_REF = re.compile(r"^(mainline|v\d+(\.\d+)*)$")
+DEFAULT_BRANCH = "mainline"
+
+# ⚠️ THE HANDOVER BLOCK, AND THE ONLY ONE. A session cannot run a release, so it cannot test a
+# release procedure — commands it composes from memory are unverified text shaped like a runbook.
+# Every line below is here because a hand-written version got it wrong and the tag did not move.
+STEPS = """\
+# Cut {ref}. Base: origin/{base}. Run these one at a time, in this order.
+# ⚠️ Not joined with && — a failure must stop where it happened, not scroll past.
+
+git fetch origin --tags --prune --prune-tags      # a stale local tag is what silently re-pushes
+git tag -d {ref} 2>/dev/null || true              # drop the local tag; `git tag` refuses to replace one
+git push origin :refs/tags/{ref}                  # drop the remote tag (skip if this is a first cut)
+
+git checkout --detach origin/{base}               # ⚠️ origin/{base}, never {base}: local may be behind
+python3 scripts/release_pins.py set {ref}
+python3 scripts/release_pins.py check {ref}       # ⚠️ must print "every pin is '{ref}'." before you commit
+
+git commit -am "Release {ref}"
+git tag {ref}
+git push origin {ref}
+
+# Verify the tag actually moved. This is the step whose absence hid the last three failures:
+git ls-remote --tags origin refs/tags/{ref}       # sha must equal the commit you just made
+git rev-parse HEAD
+
+# Then: the Release check workflow runs on the tag. It must be green before anything upgrades.
+# Then: return to {base} — `git checkout {base}` — the release commit NEVER merges.
+"""
 
 
 class PinMissing(LookupError):
@@ -111,9 +140,10 @@ def set_ref(root: pathlib.Path, ref: str) -> list[tuple[str, str, int]]:
 
 def main(argv: list[str]) -> int:
     root = pathlib.Path(__file__).resolve().parent.parent
-    if len(argv) != 3 or argv[1] not in ("check", "set"):
+    if len(argv) != 3 or argv[1] not in ("check", "set", "steps"):
         print("usage: release_pins.py check <ref>   assert every pin equals <ref>")
         print("       release_pins.py set   <ref>   rewrite every pin to <ref>")
+        print("       release_pins.py steps <ref>   print the exact commands to cut <ref>")
         return 2
     command, ref = argv[1], argv[2]
 
@@ -138,10 +168,17 @@ def run(root: pathlib.Path, command: str, ref: str) -> int:
         print(f"every pin is {ref!r}.")
         return 0
 
+    if command == "steps":
+        if not VALID_REF.match(ref):
+            raise ValueError(f"{ref!r} is not a ref this repo pins — a release like 'v4.4'.")
+        print(STEPS.format(ref=ref, base=DEFAULT_BRANCH))
+        return 0
+
     for rel, what, count in set_ref(root, ref):
         print(f"{rel}: {count} -> {ref}  ({what})")
     print("Nothing is committed and no tag is pushed; both are yours. "
           "`.github/workflows/claude.yml` is deliberately untouched — it moves after the tag.")
+    print(f"\nRemaining steps: python3 scripts/release_pins.py steps {ref}")
     return 0
 
 

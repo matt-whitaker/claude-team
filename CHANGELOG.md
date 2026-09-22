@@ -20,6 +20,8 @@ The upgrade procedure itself is [`INSTALL.md` §0](INSTALL.md).
 
 **Action required:** no — release tooling only; nothing a consumer holds changes.
 
+- **The release commands are emitted by the tool, not written by a session.** `release_pins.py steps <version>` prints the exact block, with the base ref resolved. ⚠️ **A session cannot run a release, so it cannot test a release procedure** — commands it composes from memory are unverified text shaped like a runbook, and three handovers in a row shipped one that failed silently. Each line of the block is there because a hand-written version omitted it: the **local** tag is deleted before the remote one (`git tag` refuses to replace a tag, so the subsequent push ships the old ref and the tag appears not to move), the base is `origin/mainline` rather than `mainline`, the pins are checked between the edit and the commit, the tag is read back after the push, and nothing is joined with `&&` so a failure stops where it happened. `CLAUDE.md` makes emitting the block the only way a release is handed over, and tests assert every one of those lines survives.
+
 - **Two release-tooling tests only passed on mainline.** They copied the working tree and assumed its pins read `mainline`, which is true there and false at a cut tag, where every pin already reads the tag's own name. `release-check.yml` runs the suite against the tag, so a correctly cut `v4.4` failed its own check on two assertions while the pin check itself passed. The fixture now sets the state it asserts against instead of inheriting it from the checkout. ⚠️ The tag was right and the tests were wrong — worth knowing, because the check reporting a red tag is the signal a release is unusable.
 
 ## v4.4
