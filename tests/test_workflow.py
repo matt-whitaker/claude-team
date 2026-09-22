@@ -917,6 +917,83 @@ class HarnessFoldedIn(unittest.TestCase):
         self.assertIn("claude-session.md", install)
 
 
+class TheProseRuleReachesBothReaders(unittest.TestCase):
+    """⚠️ ONE FILE, TWO DELIVERY PATHS, AND ONLY ONE OF THEM IS AN INSTALL.
+
+    `rules/claude-prose.md` governs what an agent writes — a session's and a role's alike. A
+    session gets it copied to `.claude/rules/`; a role gets it composed by `load-prompt`, because
+    whether `claude-code-action` honors a repo's committed `.claude/` config is an open drill
+    (#78 story 1b) and the four authoring roles write most of the code this package produces.
+
+    ⚠️ Dropping either path is silent: the rule still exists, still reads correctly, and simply
+    stops reaching half its audience."""
+
+    PROSE = ROOT / "rules/claude-prose.md"
+
+    def setUp(self):
+        self.text = self.PROSE.read_text(encoding="utf-8")
+
+    def test_it_ships_and_versions_independently(self):
+        self.assertRegex(self.text, r"prose-rule-revision: \d+",
+                         "it upgrades by replacement, so it carries its own revision")
+
+    def test_the_composed_prompt_includes_it(self):
+        self.assertIn("rules/claude-prose.md", ACTION,
+                      "load-prompt must compose the prose rule, or no CI role ever sees it")
+        self.assertIn('cat "$prose"', ACTION)
+
+    def test_it_is_composed_after_the_shared_frame_and_before_the_role(self):
+        """⚠️ `_shared.md` must stay first — it overrides the host action's own tag-mode prompt.
+        The role file must stay last of the three, so role specifics win any conflict."""
+        needles = ('cat "$base/_shared.md"', 'cat "$prose"', 'cat "$base/$role.md"')
+        for needle in needles:
+            self.assertIn(needle, ACTION, f"{needle} is not composed at all")
+        order = [ACTION.index(needle) for needle in needles]
+        self.assertEqual(order, sorted(order), "_shared.md, then the prose rule, then the role")
+
+    def test_a_missing_prose_rule_fails_the_step(self):
+        """Every other composed file is existence-checked; an unchecked one would compose to
+        nothing and the run would report success on a prompt missing a section."""
+        guard = ACTION[ACTION.index("for f in"):ACTION.index("d=\"PROMPT_EOF")]
+        self.assertIn('"$prose"', guard)
+
+    def test_the_install_copies_it_for_the_session_half(self):
+        install = (ROOT / "INSTALL.md").read_text()
+        self.assertIn("claude-prose.md", install)
+        self.assertIn("rules/claude-prose.md", install)
+
+    def test_it_names_what_outranks_it(self):
+        """⚠️ THE CARVE-OUTS ARE THE DESIGN, NOT DECORATION. Six of this rule's bans would
+        otherwise contradict a standing requirement, and a rule contradicting a contract gets
+        disobeyed on one side with nobody finding out which. Each must keep naming its winner."""
+        for fact in ("handover block", "🔔 Maintainer", "schema-forced channel",
+                     "the task names is requested", "syntax, not ornament"):
+            with self.subTest(carve_out=fact):
+                self.assertIn(fact, self.text)
+
+    def test_it_does_not_restate_the_session_rule(self):
+        """⚠️ A second statement of the same fact is a second thing that drifts. These four live
+        in `claude-session.md` and stay there; this rule carries what nothing else does."""
+        session = (ROOT / "rules/claude-session.md").read_text(encoding="utf-8")
+        for owned in ("Failed tests get quoted", "without historical qualifiers"):
+            with self.subTest(fact=owned):
+                self.assertIn(owned, session)
+                self.assertNotIn(owned, self.text)
+
+    def test_the_changelog_tells_a_consumer_to_copy_it(self):
+        """A rule nobody copies is a rule nobody has. The CI half needs no action, which is
+        exactly why the entry has to say the session half does.
+
+        ⚠️ Anchored on the section that carries the entry, not on a version heading beside it:
+        cutting a release moves this out of `## Unreleased` and under the new tag, and a test
+        naming either one goes stale at exactly the moment the release flow runs."""
+        sections = re.split(r"(?m)^## ", (ROOT / "CHANGELOG.md").read_text())
+        owning = [s for s in sections if "claude-prose.md" in s]
+        self.assertEqual(len(owning), 1,
+                         "the prose rule belongs to exactly one changelog section")
+        self.assertRegex(owning[0], r"\*\*Action required:\*\* yes")
+
+
 class TheCascadeIsOneUnit(unittest.TestCase):
     """The cascade's mint+dispatch was three copy-pasted step-pairs; it is one composite action
     now, called wherever a wave is dispatched. The isolation is the point — the workflow core
