@@ -1,9 +1,10 @@
 name: Load a role prompt
 description: Assembles a role's prompt from the claude-team base and this repo's overlay.
 
-# The prompt is four files, in this order:
+# The prompt is five files, in this order:
 #
 #   <team>/prompts/_shared.md          the hierarchy and house rules, every role
+#   <team>/rules/claude-prose.md       what an agent writes, every role
 #   <team>/prompts/<role>.md           how this role behaves
 #   .claude-team/prompts/_shared.md    the consumer's specifics, every role
 #   .claude-team/prompts/<role>.md     the consumer's specifics for this role
@@ -13,6 +14,11 @@ description: Assembles a role's prompt from the claude-team base and this repo's
 # — four times, for comment events — that its instructions are the triggering comment. Ours
 # arrives after all of that as `<custom_instructions>`, so the override has to be the first
 # thing in it. General frame first, role specifics second, so the specific wins any conflict.
+#
+# ⚠️ `claude-prose.md` comes from `rules/`, not `prompts/`, and that is the point: it is ONE
+# file with two delivery paths. A session gets it installed at `.claude/rules/`; a role gets
+# it composed here. Copying it into `prompts/` instead would be a second statement of the
+# same rules, which is a second thing to forget when one of them changes.
 #
 # ⚠️ `prompt` is an action INPUT, not shell — `$(cat file)` in a `with:` value arrives at
 # the model as those literal characters. `prompt_file` would avoid the dance, but only the
@@ -55,10 +61,11 @@ runs:
           git clone -q --depth 1 --branch "${{ inputs.ref }}" "https://github.com/${{ inputs.repo }}" "$RUNNER_TEMP/team-src"
         fi
         base="$RUNNER_TEMP/team-src/prompts"
+        prose="$RUNNER_TEMP/team-src/rules/claude-prose.md"
         overlay="${{ inputs.overlay }}"
         role="${{ inputs.role }}"
 
-        for f in "$base/_shared.md" "$base/$role.md" "$overlay/_shared.md"; do
+        for f in "$base/_shared.md" "$prose" "$base/$role.md" "$overlay/_shared.md"; do
           [ -f "$f" ] || { echo "::error::missing prompt file $f"; exit 1; }
         done
 
@@ -66,6 +73,8 @@ runs:
         {
           echo "body<<$d"
           cat "$base/_shared.md"
+          echo
+          cat "$prose"
           echo
           cat "$base/$role.md"
           echo

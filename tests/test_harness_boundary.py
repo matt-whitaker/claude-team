@@ -18,6 +18,10 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RULE = ROOT / ".claude/rules/claude-session.md"
 
+# Strings that belong to this repo alone. A portable rule carrying one of them installs a lie
+# into every consumer that copies it.
+LOCAL_FACTS = ("mainline", "unittest", "board 9", "TEAM_REF")
+
 
 class TheSessionRuleIsInstalled(unittest.TestCase):
     def test_the_rule_is_present(self):
@@ -36,7 +40,7 @@ class TheSessionRuleIsInstalled(unittest.TestCase):
         and the install goes back to being a merge — which is the thing the format removed."""
         text = RULE.read_text(encoding="utf-8")
         self.assertIn("replace it", text.lower())
-        for local in ("mainline", "unittest", "board 9", "TEAM_REF"):
+        for local in LOCAL_FACTS:
             with self.subTest(fact=local):
                 self.assertNotIn(local, text,
                                  f"{local!r} is this repo's — it does not belong in a portable rule")
@@ -64,7 +68,35 @@ class RulesHoldInstalledModulesOnly(unittest.TestCase):
 
     def test_the_manifest_is_the_modules_and_nothing_else(self):
         found = sorted(p.name for p in self.RULES.glob("*.md"))
-        self.assertEqual(found, ["claude-session.md"])
+        self.assertEqual(found, ["claude-prose.md", "claude-session.md"])
+
+    def test_each_install_is_byte_identical_to_its_source(self):
+        """⚠️ This repo publishes the rules AND consumes them, so a source edit that never gets
+        re-copied leaves its own sessions on a stale rule while it ships the new one — the
+        half-done upgrade, in the one repo positioned not to notice. `.claude/rules/` is an
+        install like any consumer's, not a second draft."""
+        for rule in sorted(self.RULES.glob("*.md")):
+            source = ROOT / "rules" / rule.name
+            with self.subTest(rule=rule.name):
+                self.assertTrue(source.exists(),
+                                f"{rule.name} is installed here but ships from nowhere")
+                self.assertEqual(source.read_text(encoding="utf-8"),
+                                 rule.read_text(encoding="utf-8"),
+                                 f"re-copy rules/{rule.name} — the install has drifted")
+
+    def test_every_installed_rule_is_portable(self):
+        """⚠️ The portability check was written against one rule by name, so a second module could
+        be added carrying this repo's facts and nothing would say so. Every module is checked."""
+        for rule in sorted(self.RULES.glob("*.md")):
+            text = rule.read_text(encoding="utf-8")
+            with self.subTest(rule=rule.name):
+                self.assertIn("replace it", text.lower(),
+                              f"{rule.name} must say it is replaced, not merged")
+            for local in LOCAL_FACTS:
+                with self.subTest(rule=rule.name, fact=local):
+                    self.assertNotIn(
+                        local, text,
+                        f"{local!r} is this repo's — it does not belong in a portable rule")
 
     def test_this_repos_own_facts_live_in_claude_md(self):
         """The content that used to sit beside the module. It has one home, and a session reading

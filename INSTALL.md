@@ -135,16 +135,25 @@ curl -fsSL https://raw.githubusercontent.com/matt-whitaker/claude-team/vN/rules/
   -o <target>/.claude/rules/claude-team.md
 curl -fsSL https://raw.githubusercontent.com/matt-whitaker/claude-team/vN/rules/claude-session.md \
   -o <target>/.claude/rules/claude-session.md
+curl -fsSL https://raw.githubusercontent.com/matt-whitaker/claude-team/vN/rules/claude-prose.md \
+  -o <target>/.claude/rules/claude-prose.md
 ```
 
-Two rule files, both from this repo. `claude-team.md` says how the team's backlog works;
+Three rule files, all from this repo. `claude-team.md` says how the team's backlog works;
 `claude-session.md` says how a session conducts itself in any repo (the environment, the
-maintainer's conventions, the craft, driving a story). ⚠️ **Set `claude-team.md`'s `team-ref` to
-the ref you pinned above.** It is not a second version number — it is the pin, recorded where a
-session reads rather than where a workflow does. ⚠️ **A `team-ref` that disagrees with the `uses:`
-pin is a half-done upgrade**, the only part of one a clone can detect on its own.
-`claude-session.md` versions independently by `session-rule-revision` — it is not tied to the
-workflow pin, and a re-copy is what upgrades it.
+maintainer's conventions, the craft, driving a story); `claude-prose.md` says what an agent
+**writes** — comments, docstrings, documents, commit messages. ⚠️ **Set `claude-team.md`'s
+`team-ref` to the ref you pinned above.** It is not a second version number — it is the pin,
+recorded where a session reads rather than where a workflow does. ⚠️ **A `team-ref` that disagrees
+with the `uses:` pin is a half-done upgrade**, the only part of one a clone can detect on its own.
+`claude-session.md` and `claude-prose.md` version independently, by `session-rule-revision` and
+`prose-rule-revision` — neither is tied to the workflow pin, and a re-copy is what upgrades them.
+
+⚠️ **`claude-prose.md` is the one rule that is also composed into every role's prompt**, by
+`load-prompt`, straight from this repo at the pin. Installing it here is for the **session** half;
+a role gets the same file without the install. One file, two delivery paths — so a consumer who
+skips this copy leaves its sessions uncovered while its CI roles stay correct, which is a gap that
+shows up as a person's session writing narrated comments and nobody's run doing it.
 
 ⚠️ **It carries no role instruction.** A role is given `prompts/` at run time; a rule scopes by
 file path, never by who is running.
@@ -179,7 +188,8 @@ mkdir -p .claude/hooks .claude/skills .claude/rules
 cp <claude-team>/templates/settings/settings.json .claude/settings.json
 cp <claude-team>/templates/settings/hooks/guard-push.py .claude/hooks/
 cp -R <claude-team>/skills/* .claude/skills/
-cp <claude-team>/rules/claude-team.md <claude-team>/rules/claude-session.md .claude/rules/
+cp <claude-team>/rules/claude-team.md <claude-team>/rules/claude-session.md \
+   <claude-team>/rules/claude-prose.md .claude/rules/
 ```
 
 - **The settings fragment + `guard-push.py`** are harness-enforced: no push to the default
